@@ -1,0 +1,67 @@
+import json
+import urllib.request
+import urllib.error
+import time
+import subprocess
+import os
+
+print("Starting server...")
+proc = subprocess.Popen(["python", "-m", "uvicorn", "app.main:app", "--port", "8001"])
+time.sleep(3) # Wait for server to start
+
+try:
+    print("\n--- Testing 1: Create Case ---")
+    req = urllib.request.Request(
+        "http://localhost:8001/cases/create",
+        data=json.dumps({
+            "ho_ten": "Nguyen Van A",
+            "tuoi": 45,
+            "gioi_tinh": "Nam",
+            "bac_si_id": "BS_999",
+            "trieu_chung_transcript": "Tôi bị đau ngực và khó thở từ sáng nay"
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    res = urllib.request.urlopen(req)
+    data = json.loads(res.read().decode())
+    print("Response:", json.dumps(data, indent=2))
+    case_id = data["data"]["case_id"]
+
+    print(f"\n--- Testing 2: Extract Info for {case_id} ---")
+    req = urllib.request.Request(
+        f"http://localhost:8001/cases/{case_id}/extract",
+        method="POST"
+    )
+    res = urllib.request.urlopen(req)
+    print("Response:", json.dumps(json.loads(res.read().decode()), indent=2))
+
+    print(f"\n--- Testing 3: Summarize Case for {case_id} ---")
+    req = urllib.request.Request(
+        f"http://localhost:8001/cases/{case_id}/summarize",
+        method="POST"
+    )
+    res = urllib.request.urlopen(req)
+    print("Response:", json.dumps(json.loads(res.read().decode()), indent=2))
+
+    print(f"\n--- Testing 4: Doctor Approve for {case_id} ---")
+    req = urllib.request.Request(
+        f"http://localhost:8001/cases/{case_id}/doctor-approve",
+        data=json.dumps({
+            "draft_note": "Bệnh nhân ổn định.",
+            "spo2": "98%",
+            "hr": "75",
+            "bp": "120/80"
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    res = urllib.request.urlopen(req)
+    print("Response:", json.dumps(json.loads(res.read().decode()), indent=2))
+
+    print("\nAll tests passed successfully!")
+except Exception as e:
+    print("Test failed:", e)
+finally:
+    print("Shutting down server...")
+    proc.kill()

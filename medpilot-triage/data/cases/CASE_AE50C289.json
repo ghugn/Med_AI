@@ -1,0 +1,7 @@
+{
+  "Triệu_chứng_Transcript": "Chào bạn, dạo gần đây da bạn có vấn đề gì không?\n\nMình bị nổi mụn khá nhiều ở vùng trán và hai bên má, nhất là khoảng 2 tuần gần đây.\n\nBạn có thấy mụn dạng viêm đỏ hay chỉ là mụn đầu trắng, đầu đen?\n\nCó cả hai, nhưng mụn viêm đỏ nhiều hơn, đôi khi còn đau nữa.\n\nBạn có thay đổi gì trong sinh hoạt gần đây không, ví dụ thức khuya, ăn đồ dầu mỡ hoặc đổi sản phẩm chăm sóc da?\n\nDạo này mình thức khuya nhiều và cũng mới đổi sữa rửa mặt.\n\nKhả năng cao da bạn đang bị kích ứng nhẹ kết hợp với rối loạn nội tiết do sinh hoạt. Bạn nên quay lại sản phẩm cũ nếu thấy hợp, đồng thời giữ da sạch và hạn chế thức khuya.\n\nCó cần dùng thuốc không?\n\nNếu mụn viêm nhiều, bạn có thể dùng thêm thuốc bôi chứa benzoyl peroxide hoặc kháng sinh nhẹ. Nhưng tốt nhất nên theo dõi thêm vài ngày, nếu không cải thiện thì nên đi khám trực tiếp.\n\nMình hiểu rồi, cảm ơn bạn.",
+  "Extracted_Entities": "{'vitals': {'spo2': '98%'}}",
+  "Draft_Note": "Bệnh nhân có triệu chứng cần theo dõi. Sinh hiệu trong giới hạn an toàn tạm thời.",
+  "Problem_List": "['Triệu chứng chưa xác định rõ']",
+  "Missing_Info": "[]"
+}

@@ -1,0 +1,7 @@
+{
+  "Triệu_chứng_Transcript": "test",
+  "Extracted_Entities": "{'vitals': {'spo2': '98%'}}",
+  "Draft_Note": "Bệnh nhân có triệu chứng cần theo dõi. Sinh hiệu trong giới hạn an toàn tạm thời.",
+  "Problem_List": "['Triệu chứng chưa xác định rõ']",
+  "Missing_Info": "[]"
+}

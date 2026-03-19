@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedPilot — Trợ lý AI Da liễu</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-bottom: 1px solid #1e293b;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo i { font-size: 24px; color: #38bdf8; }
+        .logo h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        .logo p { font-size: 10px; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .connection-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ef4444; /* offline by default */
+            animation: pulse-dot 2s infinite;
+        }
+        .connection-dot.online { background: #22c55e; }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .conn-label { font-size: 11px; color: #64748b; }
+
+        /* Layout */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            height: calc(100vh - 64px);
+        }
+        @media (max-width: 900px) {
+            .app-layout { grid-template-columns: 1fr; }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: #1e293b;
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid #334155;
+        }
+        .sidebar-section h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #64748b;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        .form-group { margin-bottom: 12px; }
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #38bdf8;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            color: white;
+        }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        .btn-success:hover { filter: brightness(1.1); }
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+        }
+        .btn-ghost:hover { border-color: #64748b; color: #e2e8f0; }
+        .btn-sm { padding: 8px 14px; font-size: 12px; width: auto; }
+
+        /* Main Panel */
+        .main-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 0 20px;
+        }
+        .tab {
+            padding: 14px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tab:hover { color: #94a3b8; }
+        .tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .alert i { margin-top: 2px; font-size: 16px; }
+        .alert-warning { background: #422006; border: 1px solid #854d0e; color: #fbbf24; }
+        .alert-danger  { background: #450a0a; border: 1px solid #991b1b; color: #fca5a5; }
+        .alert-success { background: #052e16; border: 1px solid #166534; color: #86efac; }
+        .alert-info    { background: #0c1a3a; border: 1px solid #1e40af; color: #93c5fd; }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-green  { background: #052e16; color: #22c55e; border: 1px solid #166534; }
+        .badge-red    { background: #450a0a; color: #ef4444; border: 1px solid #991b1b; }
+        .badge-amber  { background: #422006; color: #f59e0b; border: 1px solid #854d0e; }
+        .badge-blue   { background: #0c1a3a; color: #3b82f6; border: 1px solid #1e40af; }
+
+        /* Steps */
+        .steps { display: flex; gap: 4px; margin-bottom: 16px; }
+        .step {
+            flex: 1;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            transition: background 0.3s;
+        }
+        .step.done { background: #22c55e; }
+        .step.active { background: #38bdf8; }
+
+        /* Result fields */
+        .result-field {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .result-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #64748b;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+        .result-value { font-size: 14px; color: #e2e8f0; line-height: 1.5; }
+
+        /* Questions list */
+        .q-item {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .q-item p { font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+        .q-item input {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+        }
+        .q-item input:focus { border-color: #38bdf8; }
+
+        /* Review list */
+        .checklist-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #1e293b;
+            font-size: 13px;
+            color: #cbd5e1;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .checklist-item:last-child { border-bottom: none; }
+        .checklist-item i { color: #38bdf8; margin-top: 3px; font-size: 11px; }
+
+        /* Placeholder */
+        .placeholder {
+            text-align: center;
+            padding: 80px 20px;
+            color: #475569;
+        }
+        .placeholder i { font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.3; }
+        .placeholder p { font-size: 14px; }
+
+        /* RAG Results */
+        .rag-answer {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+        }
+        .rag-sources {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* Chat */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .msg { display: flex; }
+        .msg.user { justify-content: flex-end; }
+        .msg .bubble {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .msg.ai .bubble {
+            background: #334155;
+            color: #e2e8f0;
+            border-bottom-left-radius: 4px;
+        }
+        .msg.user .bubble {
+            background: #0ea5e9;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-input-bar {
+            padding: 12px 20px;
+            background: #1e293b;
+            border-top: 1px solid #334155;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input-bar input {
+            flex: 1;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            border-radius: 24px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+        }
+        .chat-input-bar input:focus { border-color: #38bdf8; }
+        .chat-input-bar button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #0ea5e9;
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .chat-input-bar button:hover { background: #0284c7; }
+
+        /* Spinner */
+        .spinner { display: none; }
+        .spinner.show { display: inline-flex; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner i { animation: spin 1s linear infinite; }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .mt-12 { margin-top: 12px; }
+        .mb-8 { margin-bottom: 8px; }
+        .text-xs { font-size: 12px; }
+        .text-dim { color: #64748b; }
+        .gap-8 { display: flex; gap: 8px; }
+    </style>
+</head>
+<body>
+
+<!-- ─── Header ──────────────────────────────────────────────────────── -->
+<header>
+    <div class="logo">
+        <i class="fa-solid fa-stethoscope"></i>
+        <div>
+            <h1>MedPilot</h1>
+            <p>Dermatology AI Assistant</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="connection-dot" id="conn-dot" title="MEdPilot-main connection"></div>
+        <span class="conn-label" id="conn-label">RAG: kiểm tra...</span>
+    </div>
+</header>
+
+<!-- ─── App Layout ──────────────────────────────────────────────────── -->
+<div class="app-layout">
+
+    <!-- ─── Sidebar: Patient intake ──────────────────────────────── -->
+    <div class="sidebar">
+        <div class="sidebar-section">
+            <h3><i class="fa-solid fa-user-plus"></i> Tiếp nhận bệnh nhân</h3>
+            <form id="patient-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Họ và tên</label>
+                        <input type="text" id="ho_ten" value="Nguyễn Văn A">
+                    </div>
+                    <div class="form-group">
+                        <label>Tuổi</label>
+                        <input type="number" id="tuoi" value="32">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Giới tính</label>
+                        <select id="gioi_tinh">
+                            <option>Nam</option>
+                            <option>Nữ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Bác sĩ</label>
+                        <input type="text" id="bac_si_id" value="BS_HTHU_01" readonly>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column;">
+            <h3><i class="fa-solid fa-notes-medical"></i> Mô tả triệu chứng</h3>
+            <div class="form-group" style="flex:1; display:flex; flex-direction:column;">
+                <textarea id="transcript" style="flex:1; min-height:120px; resize:none;" placeholder="VD: Bệnh nhân nổi mẩn đỏ, ngứa vùng cánh tay kéo dài 2 tuần. Da khô, bong tróc nhẹ. Không sốt..."></textarea>
+            </div>
+            <button class="btn btn-primary" id="btn-analyze" onclick="analyzeCase()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Phân tích
+            </button>
+            <button class="btn btn-ghost mt-12" onclick="resetAll()" style="margin-top:8px;">
+                Làm mới
+            </button>
+        </div>
+    </div>
+
+    <!-- ─── Main Panel ───────────────────────────────────────────── -->
+    <div class="main-panel">
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab active" data-tab="triage" onclick="switchTab('triage')">
+                <i class="fa-solid fa-heartbeat"></i> Triage & Workflow
+            </div>
+            <div class="tab" data-tab="rag" onclick="switchTab('rag')">
+                <i class="fa-solid fa-book-medical"></i> Tra cứu RAG
+            </div>
+            <div class="tab" data-tab="chat" onclick="switchTab('chat')">
+                <i class="fa-solid fa-comments"></i> Chat AI
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content-area">
+
+            <!-- ═══ TAB 1: Triage & Workflow ═══ -->
+            <div class="tab-content active" id="tab-triage">
+
+                <!-- Placeholder -->
+                <div id="triage-placeholder" class="placeholder">
+                    <i class="fa-solid fa-microscope"></i>
+                    <p>Nhập triệu chứng da liễu và nhấn <strong>Phân tích</strong></p>
+                </div>
+
+                <!-- Steps indicator -->
+                <div id="triage-steps" class="steps hidden">
+                    <div class="step" id="s1"></div>
+                    <div class="step" id="s2"></div>
+                    <div class="step" id="s3"></div>
+                </div>
+
+                <!-- Alert -->
+                <div id="triage-alert" class="hidden"></div>
+
+                <!-- Results -->
+                <div id="triage-results" class="hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Kết quả Triage</span>
+                            <span class="badge badge-blue" id="triage-badge">—</span>
+                        </div>
+                        <div class="result-field">
+                            <div class="result-label">Vấn đề phát hiện</div>
+                            <div class="result-value" id="res-problem">—</div>
+                        </div>
+                        <div class="result-field">
+                            <div class="result-label">Draft Note</div>
+                            <textarea id="res-draft" class="result-value" rows="3" style="width:100%;background:transparent;border:none;color:#e2e8f0;font-family:inherit;font-size:14px;resize:vertical;outline:none;"></textarea>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                            <div class="result-field">
+                                <div class="result-label">Mức rủi ro</div>
+                                <div class="result-value" id="res-risk" style="font-weight:800;">—</div>
+                            </div>
+                            <div class="result-field">
+                                <div class="result-label">Độ tin cậy</div>
+                                <div class="result-value" id="res-conf" style="font-weight:800;">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Missing info questions -->
+                    <div id="questions-card" class="card hidden">
+                        <div class="card-title mb-8"><i class="fa-solid fa-circle-question" style="color:#f59e0b;"></i> AI cần thêm thông tin</div>
+                        <div id="questions-list"></div>
+                        <button class="btn btn-primary mt-12" onclick="submitAnswers()" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+                            <i class="fa-solid fa-reply"></i> Gửi câu trả lời
+                        </button>
+                    </div>
+
+                    <!-- Actions -->
+                    <div id="action-buttons" class="hidden">
+                        <div class="gap-8">
+                            <button class="btn btn-primary btn-sm" onclick="reviewCase()" id="btn-review">
+                                <i class="fa-solid fa-magnifying-glass-chart"></i> Review rủi ro
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="evaluateWorkflow()" id="btn-eval" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">
+                                <i class="fa-solid fa-route"></i> Đánh giá luồng
+                            </button>
+                        </div>
+
+                        <!-- Review results -->
+                        <div id="review-card" class="card hidden" style="margin-top:12px;">
+                            <div class="card-title mb-8">Checklist Review</div>
+                            <div id="checklist-items"></div>
+                        </div>
+
+                        <!-- Decision result -->
+                        <div id="decision-card" class="card hidden" style="margin-top:12px;">
+                            <div class="card-title mb-8">Quyết định luồng</div>
+                            <div id="decision-text" style="font-size:16px;font-weight:800;text-transform:uppercase;"></div>
+                            <div id="decision-reason" class="text-xs text-dim" style="margin-top:4px;"></div>
+                        </div>
+
+                        <!-- Approve -->
+                        <button class="btn btn-success mt-12" onclick="approveCase()" style="margin-top:12px;">
+                            <i class="fa-solid fa-check-circle"></i> Phê duyệt & Lưu
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 2: RAG Query ═══ -->
+            <div class="tab-content" id="tab-rag">
+                <div class="card">
+                    <div class="card-title mb-8">Tra cứu Cơ sở tri thức Da liễu (MEdPilot-main)</div>
+                    <div class="form-group">
+                        <textarea id="rag-query" rows="2" placeholder="VD: Viêm da cơ địa ở trẻ em có triệu chứng gì?" style="resize:none;"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <select id="rag-role" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:inherit;">
+                            <option value="doctor">Bác sĩ (chi tiết)</option>
+                            <option value="patient">Bệnh nhân (đơn giản)</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="queryRAG()">
+                            <i class="fa-solid fa-search"></i> Tra cứu
+                        </button>
+                    </div>
+                </div>
+                <div id="rag-result" class="hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Kết quả từ RAG</span>
+                            <span class="text-xs text-dim" id="rag-latency"></span>
+                        </div>
+                        <div class="rag-answer" id="rag-answer"></div>
+                        <div class="rag-sources" id="rag-sources"></div>
+                    </div>
+                </div>
+                <div id="rag-placeholder" class="placeholder">
+                    <i class="fa-solid fa-database"></i>
+                    <p>Kết nối tới MEdPilot-main để tra cứu cơ sở tri thức da liễu</p>
+                </div>
+            </div>
+
+            <!-- ═══ TAB 3: Chat ═══ -->
+            <div class="tab-content" id="tab-chat" style="height:100%;padding:0;">
+                <div class="chat-container">
+                    <div style="padding:12px 20px;background:#1e293b;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;">
+                        <span class="text-xs" style="color:#64748b;font-weight:700;">Vai trò:</span>
+                        <select id="chat-role" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;outline:none;">
+                            <option value="doctor">Bác sĩ</option>
+                            <option value="patient">Bệnh nhân</option>
+                        </select>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="msg ai">
+                            <div class="bubble">Xin chào! Tôi là MedPilot — trợ lý AI da liễu. Chọn vai trò và đặt câu hỏi nhé.</div>
+                        </div>
+                    </div>
+                    <div class="chat-input-bar">
+                        <input type="text" id="chat-input" placeholder="Nhập câu hỏi về da liễu..." onkeypress="if(event.key==='Enter')sendChat()">
+                        <button onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8080/api/v1";
+    let caseId = null;
+
+    // ─── Tabs ──────────────────────────────────────────────────
+    function switchTab(id) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[data-tab="${id}"]`).classList.add('active');
+        document.getElementById('tab-' + id).classList.add('active');
+    }
+
+    // ─── Connection check ──────────────────────────────────────
+    async function checkConnection() {
+        try {
+            const r = await fetch(`${API}/medpilot/health`);
+            const d = await r.json();
+            const dot = document.getElementById('conn-dot');
+            const lbl = document.getElementById('conn-label');
+            if (d.status === 'online') {
+                dot.classList.add('online');
+                lbl.textContent = 'RAG: online';
+            } else {
+                dot.classList.remove('online');
+                lbl.textContent = 'RAG: offline';
+            }
+        } catch {
+            document.getElementById('conn-dot').classList.remove('online');
+            document.getElementById('conn-label').textContent = 'RAG: offline';
+        }
+    }
+    checkConnection();
+    setInterval(checkConnection, 30000);
+
+    // ─── Triage Flow ───────────────────────────────────────────
+    async function analyzeCase() {
+        const t = document.getElementById('transcript').value.trim();
+        if (!t) return alert('Vui lòng nhập triệu chứng!');
+
+        setBtnLoading('btn-analyze', true);
+        document.getElementById('triage-placeholder').classList.add('hidden');
+
+        try {
+            if (!caseId) {
+                const r = await fetch(`${API}/cases/create`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        ho_ten: document.getElementById('ho_ten').value,
+                        tuoi: parseInt(document.getElementById('tuoi').value),
+                        gioi_tinh: document.getElementById('gioi_tinh').value,
+                        bac_si_id: document.getElementById('bac_si_id').value,
+                        trieu_chung_transcript: t
+                    })
+                });
+                const d = await r.json();
+                caseId = d.data.case_id;
+            }
+
+            const r2 = await fetch(`${API}/cases/${caseId}/extract-and-triage`, {method:'POST'});
+            const data = await r2.json();
+            displayTriage(data);
+        } catch (e) {
+            alert('Lỗi: ' + e.message);
+        }
+        setBtnLoading('btn-analyze', false);
+    }
+
+    function displayTriage(res) {
+        const d = res.data || {};
+        const state = d.state || {};
+        const decision = d.decision || {};
+        const alertLvl = decision.alert_level || d.alert_level || 'NORMAL';
+        const action = decision.action_required || 'unknown';
+
+        // Steps
+        const steps = document.getElementById('triage-steps');
+        steps.classList.remove('hidden');
+        document.getElementById('s1').className = 'step done';
+
+        // Results
+        const results = document.getElementById('triage-results');
+        results.classList.remove('hidden');
+
+        // Badge
+        const badge = document.getElementById('triage-badge');
+        badge.textContent = alertLvl;
+        badge.className = 'badge ' + (alertLvl === 'CRITICAL' ? 'badge-red' : alertLvl === 'WARNING' ? 'badge-amber' : 'badge-green');
+
+        // Fields
+        document.getElementById('res-problem').textContent = (state.problem_list || []).join(', ') || state.trieu_chung || '—';
+        document.getElementById('res-draft').value = state.draft_note || state.thuoc_va_benh_nen || '';
+        document.getElementById('res-risk').textContent = alertLvl === 'CRITICAL' ? 'CÓ' : 'KHÔNG';
+        document.getElementById('res-risk').style.color = alertLvl === 'CRITICAL' ? '#ef4444' : '#22c55e';
+        document.getElementById('res-conf').textContent = res.success ? 'CAO' : 'TRUNG BÌNH';
+
+        // Alert
+        const alertDiv = document.getElementById('triage-alert');
+        alertDiv.classList.remove('hidden');
+        if (action === 'NEED_INPUT' || action === 'require_input') {
+            alertDiv.className = 'alert alert-warning';
+            alertDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><div><strong>Cần bổ sung</strong><br>${decision.rationale || decision.reasoning || res.message || ''}</div>`;
+        } else if (alertLvl === 'CRITICAL') {
+            alertDiv.className = 'alert alert-danger';
+            alertDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i><div><strong>Cảnh báo</strong><br>${decision.rationale || decision.reasoning || ''}</div>`;
+        } else {
+            alertDiv.className = 'alert alert-success';
+            alertDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i><div><strong>An toàn</strong> — Hồ sơ sơ bộ sẵn sàng.</div>`;
+        }
+
+        // Questions
+        const missing = state.missing_info_checklist || state.missing_info || [];
+        const qCard = document.getElementById('questions-card');
+        const qList = document.getElementById('questions-list');
+        if (missing.length > 0 && (action === 'NEED_INPUT' || action === 'require_input')) {
+            qCard.classList.remove('hidden');
+            qList.innerHTML = '';
+            missing.forEach((q, i) => {
+                const div = document.createElement('div');
+                div.className = 'q-item';
+                div.innerHTML = `<p>${typeof q === 'string' ? q : q.question || q}</p><input type="text" data-idx="${i}" data-q="${typeof q === 'string' ? q : q.question || q}" class="q-input" placeholder="Trả lời...">`;
+                qList.appendChild(div);
+            });
+        } else {
+            qCard.classList.add('hidden');
+        }
+
+        // Actions
+        const actions = document.getElementById('action-buttons');
+        if (action !== 'NEED_INPUT' && action !== 'require_input') {
+            actions.classList.remove('hidden');
+            document.getElementById('s2').className = 'step active';
+        } else {
+            actions.classList.add('hidden');
+        }
+    }
+
+    async function submitAnswers() {
+        const inputs = document.querySelectorAll('.q-input');
+        const answers = [];
+        inputs.forEach(inp => {
+            if (inp.value.trim()) {
+                answers.push({question_id: inp.dataset.q || `Q${inp.dataset.idx}`, answer: inp.value.trim()});
+            }
+        });
+        if (!answers.length) return alert('Nhập ít nhất 1 câu trả lời!');
+
+        try {
+            await fetch(`${API}/cases/${caseId}/answers`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({answers})
+            });
+            await analyzeCase();
+        } catch(e) { alert('Lỗi: '+e.message); }
+    }
+
+    async function reviewCase() {
+        if (!caseId) return;
+        setBtnLoading('btn-review', true);
+        try {
+            const r = await fetch(`${API}/cases/${caseId}/review`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({doctor_draft_note: document.getElementById('res-draft').value, vitals_input:{}})
+            });
+            const d = await r.json();
+            const card = document.getElementById('review-card');
+            const list = document.getElementById('checklist-items');
+            card.classList.remove('hidden');
+            list.innerHTML = '';
+            const items = (d.data?.state?.missing_info_checklist) || (d.data?.state?.missing_info) || [];
+            if (items.length) {
+                items.forEach(it => {
+                    list.innerHTML += `<div class="checklist-item"><i class="fa-solid fa-circle-dot"></i><span>${typeof it==='string' ? it : it.item||it}</span></div>`;
+                });
+            } else {
+                list.innerHTML = `<div class="checklist-item"><i class="fa-solid fa-check"></i><span>${d.message || 'Không phát hiện rủi ro bổ sung.'}</span></div>`;
+            }
+            document.getElementById('s2').className = 'step done';
+        } catch(e) { alert('Lỗi: '+e.message); }
+        setBtnLoading('btn-review', false);
+    }
+
+    async function evaluateWorkflow() {
+        if (!caseId) return;
+        setBtnLoading('btn-eval', true);
+        try {
+            const r = await fetch(`${API}/cases/${caseId}/evaluate-workflow`, {method:'POST'});
+            const d = await r.json();
+            const card = document.getElementById('decision-card');
+            card.classList.remove('hidden');
+            const dec = d.data?.decision || {};
+            const action = dec.action_required || 'unknown';
+            document.getElementById('decision-text').textContent = action.replace(/_/g,' ');
+            document.getElementById('decision-text').style.color = (action==='PROCEED'||action==='ready_for_approval') ? '#22c55e' : action==='NEED_INPUT' ? '#f59e0b' : '#ef4444';
+            document.getElementById('decision-reason').textContent = dec.rationale || dec.reasoning || d.message || '';
+            document.getElementById('s3').className = 'step done';
+        } catch(e) { alert('Lỗi: '+e.message); }
+        setBtnLoading('btn-eval', false);
+    }
+
+    async function approveCase() {
+        if (!caseId) return;
+        try {
+            const r = await fetch(`${API}/cases/${caseId}/doctor-approve`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({draft_note: document.getElementById('res-draft').value||'', spo2:'', hr:'', bp:''})
+            });
+            const d = await r.json();
+            if (d.success) { alert('✅ Đã lưu vào Excel!'); resetAll(); }
+            else alert('Lỗi: '+(d.message||''));
+        } catch(e) { alert('Lỗi: '+e.message); }
+    }
+
+    function resetAll() {
+        caseId = null;
+        document.getElementById('transcript').value = '';
+        document.getElementById('triage-placeholder').classList.remove('hidden');
+        document.getElementById('triage-steps').classList.add('hidden');
+        document.getElementById('triage-alert').classList.add('hidden');
+        document.getElementById('triage-results').classList.add('hidden');
+        document.getElementById('questions-card').classList.add('hidden');
+        document.getElementById('action-buttons').classList.add('hidden');
+        document.getElementById('review-card').classList.add('hidden');
+        document.getElementById('decision-card').classList.add('hidden');
+        ['s1','s2','s3'].forEach(s => document.getElementById(s).className = 'step');
+    }
+
+    // ─── RAG Query ─────────────────────────────────────────────
+    async function queryRAG() {
+        const q = document.getElementById('rag-query').value.trim();
+        if (!q) return alert('Nhập câu hỏi!');
+        const role = document.getElementById('rag-role').value;
+
+        document.getElementById('rag-placeholder').classList.add('hidden');
+        document.getElementById('rag-result').classList.add('hidden');
+
+        try {
+            // Try bridge first (MEdPilot-main)
+            const r = await fetch(`${API}/medpilot/query`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({query: q, top_k: 3})
+            });
+            const d = await r.json();
+            const result = d.data || {};
+
+            document.getElementById('rag-result').classList.remove('hidden');
+            document.getElementById('rag-answer').textContent = result.answer || d.message || 'Không có kết quả.';
+            document.getElementById('rag-latency').textContent = result.latency ? `⏱ ${result.latency}` : '';
+
+            const srcDiv = document.getElementById('rag-sources');
+            srcDiv.innerHTML = '';
+            if (result.retrieved_chunks) {
+                srcDiv.innerHTML = `<span class="badge badge-blue">${result.retrieved_chunks} chunks</span>`;
+            }
+        } catch(e) {
+            document.getElementById('rag-result').classList.remove('hidden');
+            document.getElementById('rag-answer').textContent = '⚠️ Không thể kết nối MEdPilot-main: ' + e.message;
+        }
+    }
+
+    // ─── Chat ──────────────────────────────────────────────────
+    let chatHistory = [];
+
+    async function sendChat() {
+        const msg = document.getElementById('chat-input').value.trim();
+        if (!msg) return;
+        document.getElementById('chat-input').value = '';
+
+        appendChat('user', msg);
+        chatHistory.push({role:'user', content:msg});
+
+        try {
+            const r = await fetch(`${API}/chat/`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    case_id: caseId,
+                    user_role: document.getElementById('chat-role').value,
+                    message: msg,
+                    history: chatHistory
+                })
+            });
+            const d = await r.json();
+            appendChat('ai', d.reply || d.message || 'Không có phản hồi.');
+            chatHistory.push({role:'ai', content: d.reply || d.message || ''});
+        } catch(e) {
+            appendChat('ai', '⚠️ Lỗi: ' + e.message);
+        }
+    }
+
+    function appendChat(role, text) {
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.innerHTML = `<div class="bubble">${text}</div>`;
+        document.getElementById('chat-messages').appendChild(div);
+        document.getElementById('chat-messages').scrollTop = 99999;
+    }
+
+    // ─── Helpers ───────────────────────────────────────────────
+    function setBtnLoading(id, loading) {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = loading;
+        if (loading) btn.dataset.origHtml = btn.innerHTML;
+        btn.innerHTML = loading ? '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...' : (btn.dataset.origHtml || btn.innerHTML);
+    }
+</script>
+</body>
+</html>
