@@ -2,7 +2,7 @@ import os
 import json
 import chromadb
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+import requests
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import hashlib
@@ -31,7 +31,22 @@ class DiseaseIndexerCombined:
         self.json_file = Path(json_file)
         self.metadata_file = self.cache_path / "metadata.json"
         
-        self.model = SentenceTransformer(model_name)
+        self.model_name = model_name
+
+    def _get_embedding(self, text: str) -> list:
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/embeddings",
+                json={"model": "all-minilm", "prompt": text},
+                timeout=2.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "embedding" in data:
+                    return data["embedding"]
+        except Exception:
+            pass
+        return [0.0] * 384
         self.client = chromadb.PersistentClient(path=db_path)
         self.collection = self.client.get_or_create_collection(
             name="diseases",
@@ -248,8 +263,10 @@ class DiseaseIndexerCombined:
                         "indexed_at": datetime.now().isoformat()
                     }
                     
+                    embedding = self._get_embedding(chunk)
                     self.collection.add(
                         ids=[chunk_id],
+                        embeddings=[embedding],
                         documents=[chunk],
                         metadatas=[metadata]
                     )

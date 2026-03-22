@@ -1,0 +1,225 @@
+BỘ MẪU QnA DEMO CHO DỰ ÁN MEDPILOT
+
+========================================
+PHẦN 1. CHẾ ĐỘ BỆNH NHÂN
+5 QnA HỎI ĐÁP LIÊN TỤC VỀ DA LIỄU
+========================================
+
+QnA 1
+Bệnh nhân:
+Dạo gần đây da tay tôi bị ngứa và hơi đỏ, nguyên nhân có thể do đâu?
+
+Chatbot:
+Ngứa và đỏ da tay có thể liên quan đến nhiều nguyên nhân khác nhau như kích ứng do xà phòng, nước rửa chén, viêm da tiếp xúc, da khô hoặc chàm. Một số trường hợp cũng có thể liên quan đến dị ứng hoặc các bệnh da liễu khác. Nếu tình trạng kéo dài, tái đi tái lại, lan rộng hoặc gây khó chịu nhiều, bạn nên đi khám bác sĩ da liễu để được đánh giá chính xác. Thông tin này chỉ mang tính tham khảo, không thay thế chẩn đoán của bác sĩ.
+
+QnA 2
+Bệnh nhân:
+Nếu tôi bị như vậy khoảng 2 tuần rồi thì có đáng lo không?
+
+Chatbot:
+Nếu triệu chứng kéo dài khoảng 2 tuần mà chưa cải thiện thì bạn nên theo dõi kỹ hơn. Trường hợp ngứa nhiều, ảnh hưởng sinh hoạt, vùng da tổn thương lan rộng hoặc không đỡ sau khi tự chăm sóc cơ bản thì nên đi khám bác sĩ da liễu. Nếu có thêm các dấu hiệu như sưng đau rõ, chảy dịch, nổi bóng nước nhiều, sốt hoặc mệt thì càng nên đi khám sớm. Việc đánh giá trực tiếp sẽ giúp xác định nguyên nhân rõ hơn.
+
+QnA 3
+Bệnh nhân:
+Tôi thấy mỗi lần rửa chén xong thì ngứa hơn, như vậy có liên quan không?
+
+Chatbot:
+Điều đó có thể có liên quan. Một số chất tẩy rửa hoặc việc tiếp xúc nước nhiều lần có thể làm da bị kích ứng hoặc làm nặng thêm tình trạng viêm da sẵn có. Nếu bạn thấy ngứa tăng rõ sau khi rửa chén hoặc tiếp xúc nước rửa chén thì đây là một yếu tố nên chú ý. Bạn có thể thử hạn chế tiếp xúc trực tiếp, dùng găng tay phù hợp, rửa tay nhẹ nhàng và dưỡng ẩm sau khi tiếp xúc. Tuy nhiên, để xác định nguyên nhân cụ thể vẫn cần bác sĩ đánh giá trực tiếp.
+
+QnA 4
+Bệnh nhân:
+Tôi có thể tự mua thuốc bôi ở tiệm thuốc được không?
+
+Chatbot:
+Bạn không nên tự dùng thuốc bôi kéo dài nếu chưa rõ nguyên nhân, đặc biệt là các thuốc có chứa corticoid vì nếu dùng không đúng có thể làm tình trạng da nặng hơn hoặc che lấp triệu chứng thật. Trong lúc chờ đi khám, bạn có thể chăm sóc cơ bản như tránh chất kích ứng, giữ da sạch nhẹ nhàng và dùng kem dưỡng ẩm phù hợp. Nếu tổn thương không cải thiện hoặc nặng hơn, bạn nên đi khám bác sĩ da liễu để được hướng dẫn đúng.
+
+QnA 5
+Bệnh nhân:
+Khi nào thì tôi cần đi khám ngay?
+
+Chatbot:
+Bạn nên đi khám sớm nếu có một trong các dấu hiệu sau: tổn thương lan nhanh, đau nhiều, sưng nhiều, chảy dịch, chảy máu, nổi bóng nước nhiều, ngứa quá mức ảnh hưởng sinh hoạt, hoặc kèm sốt, mệt rõ. Nếu có khó thở, sưng môi hoặc lưỡi, choáng, hay phản ứng toàn thân thì cần đến cơ sở y tế ngay. Chatbot chỉ hỗ trợ thông tin tham khảo, không thay thế bác sĩ.
+
+========================================
+PHẦN 2. CHẾ ĐỘ BÁC SĨ
+5 QnA GỢI Ý CHẨN ĐOÁN DỰA TRÊN THÔNG TIN
+ĐÃ ĐƯỢC TRÍCH XUẤT TỪ JSON
+========================================
+
+Giả định dữ liệu sau extraction:
+- chief_complaint: nổi đỏ, ngứa nhiều, bong vảy nhẹ ở hai bàn tay
+- duration: khoảng 2 tuần
+- onset: ban đầu hơi đỏ ở mu bàn tay, sau vài ngày ngứa nhiều hơn và lan ra cổ tay
+- lesion_location: hai bàn tay, cổ tay
+- lesion_distribution: hai bên, tay phải nặng hơn
+- itching: true
+- pain: false
+- burning: chưa rõ
+- scaling: true
+- blister: false
+- discharge: false
+- bleeding: false
+- trigger_factors: rửa chén nhiều, tiếp xúc nước rửa chén
+- previous_treatment: bôi kem không rõ tên, cải thiện ít
+- history_update: từng bị viêm da cơ địa khoảng 2 năm trước
+- allergy_update: chưa rõ
+- negative findings: không sốt, không mệt, không chảy dịch, không chảy máu, không đau
+- uncertain_fields: burning, allergy_update, previous_treatment
+
+QnA 1
+Bác sĩ:
+Dựa trên dữ liệu đã trích xuất, AI gợi ý các hướng chẩn đoán nào nên cân nhắc?
+
+AI hỗ trợ bác sĩ:
+Dựa trên các dữ kiện hiện có, có thể cân nhắc trước hết viêm da tiếp xúc kích ứng do vị trí tổn thương nằm ở hai bàn tay, triệu chứng tăng khi tiếp xúc nước rửa chén và có tính chất khá phù hợp với yếu tố kích ứng. Ngoài ra, cũng nên cân nhắc viêm da tiếp xúc dị ứng nếu có thêm yếu tố tiếp xúc với chất gây dị ứng cụ thể. Một hướng khác cần lưu ý là đợt bùng phát viêm da cơ địa vì bệnh nhân có tiền sử từng bị viêm da cơ địa trước đây. Đây chỉ là các hướng cần cân nhắc thêm để hỗ trợ bác sĩ, không phải chẩn đoán cuối cùng.
+
+QnA 2
+Bác sĩ:
+Những dữ kiện nào đang ủng hộ hướng viêm da tiếp xúc kích ứng?
+
+AI hỗ trợ bác sĩ:
+Một số dữ kiện đang ủng hộ hướng viêm da tiếp xúc kích ứng gồm:
+- tổn thương nằm ở hai bàn tay và lan ra cổ tay, là vùng thường tiếp xúc với hóa chất sinh hoạt,
+- triệu chứng tăng khi bệnh nhân rửa chén và tiếp xúc nước rửa chén,
+- tổn thương xuất hiện hai bên,
+- biểu hiện nổi đỏ, ngứa và bong vảy nhẹ khá phù hợp với tình trạng viêm da do kích ứng.
+Tuy nhiên, để làm rõ hơn, vẫn nên khai thác thêm tần suất tiếp xúc, loại chất tẩy rửa sử dụng, việc có dùng găng tay hay không và thời điểm khởi phát so với thay đổi sinh hoạt gần đây.
+
+QnA 3
+Bác sĩ:
+AI thấy còn thiếu thông tin gì để phân biệt tốt hơn giữa viêm da tiếp xúc và viêm da cơ địa?
+
+AI hỗ trợ bác sĩ:
+Để phân biệt tốt hơn giữa viêm da tiếp xúc kích ứng, viêm da tiếp xúc dị ứng và viêm da cơ địa, cần hỏi thêm:
+- bệnh sử tái phát trước đây và vị trí tổn thương ở các đợt cũ,
+- có tiền sử dị ứng cá nhân hoặc gia đình hay không,
+- bệnh nhân có nền da khô hoặc cơ địa dị ứng như hen, viêm mũi dị ứng hay không,
+- có tiếp xúc với mỹ phẩm, găng tay, kim loại, chất mới hoặc chất nghi ngờ khác ngoài nước rửa chén hay không,
+- cảm giác rát, nóng da hoặc châm chích có thật sự hiện diện hay không,
+- tổn thương có nứt, dày da hay lichen hóa không,
+- hình thái tổn thương thực thể khi khám trực tiếp.
+Các dữ kiện này sẽ giúp định hướng chẩn đoán tốt hơn.
+
+QnA 4
+Bác sĩ:
+Có red flags nào nổi bật từ dữ liệu hiện tại không?
+
+AI hỗ trợ bác sĩ:
+Hiện tại chưa thấy red flags rõ rệt vì chưa ghi nhận sốt, đau nhiều, chảy dịch, chảy máu, bóng nước lan rộng hoặc triệu chứng toàn thân. Tuy nhiên, vẫn cần khám trực tiếp để đánh giá nguy cơ bội nhiễm, mức độ viêm, mức độ lan rộng thực tế và đặc điểm tổn thương tại chỗ. Nếu sau đó xuất hiện đau tăng, tiết dịch, phù nề nhiều, sốt hoặc tổn thương lan nhanh thì cần chú ý hơn.
+
+QnA 5
+Bác sĩ:
+AI gợi ý tôi nên hỏi thêm gì ngay ở lượt tiếp theo?
+
+AI hỗ trợ bác sĩ:
+Có thể ưu tiên hỏi thêm các câu sau:
+- thời điểm bắt đầu rửa chén nhiều hơn có trùng với lúc khởi phát tổn thương không,
+- bệnh nhân có dùng găng tay không, nếu có thì là loại nào và có bị bí, kích ứng hay không,
+- ngoài nước rửa chén còn tiếp xúc với mỹ phẩm, chất tẩy khác, kim loại hoặc chất mới nào không,
+- bệnh nhân có tiền sử hen, viêm mũi dị ứng, chàm hoặc cơ địa dị ứng không,
+- loại kem đã bôi trước đó là gì, có còn vỏ thuốc hoặc nhớ thành phần nào không,
+- có cảm giác rát, châm chích, nóng da hoặc nứt da không,
+- mức độ ảnh hưởng sinh hoạt hằng ngày như thế nào.
+Các câu hỏi này giúp làm rõ yếu tố kích ứng, yếu tố dị ứng, tiền sử cơ địa và hỗ trợ bác sĩ định hướng tốt hơn.
+
+========================================
+PHẦN 3. BẢN DEMO CHUỖI HỘI THOẠI TỰ NHIÊN
+CHO CHẾ ĐỘ BỆNH NHÂN
+========================================
+
+Lượt 1
+Bệnh nhân:
+Da tay tôi bị ngứa và đỏ khoảng 2 tuần nay, tôi nên nghĩ đến vấn đề gì?
+
+Chatbot:
+Ngứa và đỏ da tay kéo dài 2 tuần có thể liên quan đến kích ứng, viêm da tiếp xúc, da khô hoặc chàm. Nếu tình trạng không cải thiện, lan rộng hoặc tái phát nhiều lần thì bạn nên đi khám bác sĩ da liễu để được đánh giá chính xác. Đây chỉ là thông tin tham khảo.
+
+Lượt 2
+Bệnh nhân:
+Tôi thấy sau khi rửa chén xong thì ngứa hơn nhiều.
+
+Chatbot:
+Điều đó có thể gợi ý da của bạn đang bị kích ứng bởi nước rửa chén hoặc việc tiếp xúc nước quá thường xuyên. Bạn nên hạn chế tiếp xúc trực tiếp, có thể dùng găng tay phù hợp và dưỡng ẩm sau đó. Tuy nhiên, để biết chính xác nguyên nhân vẫn cần bác sĩ đánh giá.
+
+Lượt 3
+Bệnh nhân:
+Tôi có cần mua thuốc bôi không?
+
+Chatbot:
+Bạn không nên tự ý dùng thuốc bôi kéo dài nếu chưa rõ nguyên nhân, nhất là thuốc chứa corticoid. Bạn có thể chăm sóc cơ bản bằng cách tránh chất kích ứng và dưỡng ẩm. Nếu không đỡ, nên đi khám bác sĩ da liễu.
+
+Lượt 4
+Bệnh nhân:
+Nếu tôi chưa đi khám ngay thì cần theo dõi gì?
+
+Chatbot:
+Bạn nên theo dõi xem tổn thương có lan rộng hơn không, có chảy dịch, chảy máu, đau, nổi bóng nước hoặc ảnh hưởng sinh hoạt nhiều không. Nếu có các dấu hiệu đó thì nên đi khám sớm hơn.
+
+Lượt 5
+Bệnh nhân:
+Khi nào là mức phải đi khám ngay?
+
+Chatbot:
+Bạn nên đi khám ngay nếu tổn thương lan nhanh, đau nhiều, sưng nhiều, chảy dịch, sốt, nổi bóng nước nhiều hoặc có biểu hiện toàn thân. Nếu có khó thở, sưng môi lưỡi hoặc phản ứng nặng thì cần đến cơ sở y tế ngay.
+
+========================================
+PHẦN 4. BẢN DEMO CHUỖI HỘI THOẠI TỰ NHIÊN
+CHO CHẾ ĐỘ BÁC SĨ
+========================================
+
+Lượt 1
+Bác sĩ:
+Dựa trên dữ liệu extraction hiện tại, hướng chẩn đoán nào nên được cân nhắc trước?
+
+AI hỗ trợ bác sĩ:
+Hướng nên cân nhắc trước là viêm da tiếp xúc kích ứng. Ngoài ra, cần cân nhắc thêm viêm da tiếp xúc dị ứng và đợt bùng phát viêm da cơ địa dựa trên tiền sử bệnh nhân.
+
+Lượt 2
+Bác sĩ:
+Vì sao AI ưu tiên viêm da tiếp xúc kích ứng?
+
+AI hỗ trợ bác sĩ:
+Vì tổn thương ở bàn tay là vị trí thường tiếp xúc chất tẩy rửa, triệu chứng tăng sau khi rửa chén và tiếp xúc nước rửa chén, biểu hiện đỏ, ngứa, bong vảy cũng tương đối phù hợp với hướng này.
+
+Lượt 3
+Bác sĩ:
+Thiếu thông tin gì để tăng độ chắc chắn?
+
+AI hỗ trợ bác sĩ:
+Cần hỏi thêm về tiền sử dị ứng, nền da khô, yếu tố tiếp xúc khác, việc dùng găng tay, cảm giác rát có thật sự có hay không, và khám trực tiếp hình thái tổn thương.
+
+Lượt 4
+Bác sĩ:
+Có dấu hiệu nguy hiểm gì ở ca này không?
+
+AI hỗ trợ bác sĩ:
+Hiện chưa thấy dấu hiệu cảnh báo nguy hiểm rõ rệt vì chưa có sốt, chảy dịch, đau nhiều hay triệu chứng toàn thân. Tuy nhiên vẫn cần khám trực tiếp để loại trừ bội nhiễm và đánh giá mức độ thực tế.
+
+Lượt 5
+Bác sĩ:
+AI đề xuất tôi nên hỏi gì ngay bây giờ?
+
+AI hỗ trợ bác sĩ:
+Nên hỏi thêm về loại chất tẩy rửa, thời điểm khởi phát so với thời điểm tăng tiếp xúc, việc dùng găng tay, tiền sử dị ứng hoặc cơ địa dị ứng, và loại kem đã sử dụng trước đó.
+
+========================================
+PHẦN 5. GHI CHÚ VỀ CÁCH DÙNG TRONG DEMO
+========================================
+
+1. Với chế độ bệnh nhân
+- Câu trả lời phải an toàn
+- Không khẳng định chắc chắn bệnh
+- Không thay thế bác sĩ chẩn đoán
+- Nên có câu khuyến nghị đi khám khi cần
+- Ưu tiên ngôn ngữ dễ hiểu, thân thiện
+
+2. Với chế độ bác sĩ
+- AI chỉ gợi ý hướng chẩn đoán cần cân nhắc
+- AI nên nêu rõ dữ kiện nào đang ủng hộ từng hướng
+- AI nên nhắc thông tin còn thiếu
+- AI nên gợi ý câu hỏi khai thác thêm
+- Không đưa ra kết luận chẩn đoán cuối cùng thay bác sĩ
+
+3. Điểm khác nhau cốt lõi
+- Chế độ bệnh nhân: giải thích, hướng dẫn, khuyến nghị an toàn
+- Chế độ bác sĩ: hỗ trợ reasoning lâm sàng, nhắc thiếu dữ kiện, gợi ý hướng chẩn đoán tham khảo

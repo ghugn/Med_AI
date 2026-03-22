@@ -6,7 +6,7 @@ Load từ diseases.json → Embedding → Vector DB
 
 import json
 import chromadb
-from sentence_transformers import SentenceTransformer
+import requests
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -45,8 +45,27 @@ class RAGEngine:
         self.embedding_cache = {}
         self.cache_size = cache_size
 
-        logger.info(f"📥 Loading embedding model... (cache size: {cache_size})")
-        self.embedding_model = SentenceTransformer(embedding_model)
+        logger.info(f"📥 Configured embedding model: {embedding_model} (cache size: {cache_size})")
+        self.embedding_model_name = embedding_model
+
+    def _get_embedding(self, text: str) -> list:
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/embeddings",
+                json={
+                    "model": "all-minilm", # User can use any model
+                    "prompt": text
+                },
+                timeout=2.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "embedding" in data:
+                    return data["embedding"]
+        except Exception as e:
+            pass
+        return [0.0] * 384
+
 
         logger.info(f"💾 Initializing Chroma DB...")
         self.chroma_client = chromadb.PersistentClient(path=db_path)
@@ -166,8 +185,8 @@ class RAGEngine:
                 # ID duy nhất
                 chunk_id = f"{disease_name}_{chunk_idx}"
 
-                # Embed (sentence-transformers is efficient)
-                embedding = self.embedding_model.encode(chunk)
+                # Embed (using Ollama API)
+                embedding = self._get_embedding(chunk)
 
                 # Metadata
                 metadata = {
@@ -178,7 +197,7 @@ class RAGEngine:
 
                 # Batch accumulation
                 batch_ids.append(chunk_id)
-                batch_embeddings.append(embedding.tolist())
+                batch_embeddings.append(embedding)
                 batch_documents.append(chunk)
                 batch_metadatas.append(metadata)
                 total_chunks += 1
@@ -226,7 +245,7 @@ class RAGEngine:
             logger.debug(f"📦 Cache hit for: '{query[:50]}...'")
         else:
             # Embed query
-            query_embedding = self.embedding_model.encode(query)
+            query_embedding = self._get_embedding(query)
             
             # Store in cache (FIFO eviction if full)
             if len(self.embedding_cache) >= self.cache_size:
@@ -237,7 +256,7 @@ class RAGEngine:
 
         # Search in Chroma
         results = self.collection.query(
-            query_embeddings=[query_embedding.tolist()],
+            query_embeddings=[query_embedding],
             n_results=top_k
         )
 

@@ -1,5 +1,5 @@
 import chromadb
-from sentence_transformers import SentenceTransformer
+import requests
 from typing import List, Dict
 
 class DiseaseRAGRetriever:
@@ -11,10 +11,30 @@ class DiseaseRAGRetriever:
             db_path: Đường dẫn Chroma DB
             model_name: Tên model Sentence-Transformers
         """
-        self.model = SentenceTransformer(model_name)
+        self.model_name = model_name
         self.client = chromadb.PersistentClient(path=db_path)
         self.collection = self.client.get_collection(name="diseases")
         print("✅ RAG Retriever initialized")
+    
+    def _get_embedding(self, text: str) -> list:
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/embeddings",
+                json={
+                    "model": "all-minilm", # User can use any model
+                    "prompt": text
+                },
+                timeout=2.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "embedding" in data:
+                    return data["embedding"]
+        except Exception as e:
+            pass
+        # Fallback to zeros if Ollama is currently down
+        return [0.0] * 384
+
     
     def retrieve(self, query: str, top_k: int = 5, min_similarity: float = 0.3) -> List[Dict]:
         """
@@ -28,9 +48,9 @@ class DiseaseRAGRetriever:
         Returns:
             List các kết quả với thông tin chi tiết
         """
-        # Query Vector DB
+        query_embedding = self._get_embedding(query)
         results = self.collection.query(
-            query_texts=[query],
+            query_embeddings=[query_embedding],
             n_results=top_k
         )
         

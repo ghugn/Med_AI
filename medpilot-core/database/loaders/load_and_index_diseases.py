@@ -1,7 +1,7 @@
 import os
 import chromadb
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+import requests
 import json
 from datetime import datetime
 
@@ -15,7 +15,22 @@ class DiseaseIndexer:
             model_name: Tên model Sentence-Transformers (hỗ trợ tiếng Việt)
         """
         self.db_path = db_path
-        self.model = SentenceTransformer(model_name)
+        self.model_name = model_name
+
+    def _get_embedding(self, text: str) -> list:
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/embeddings",
+                json={"model": "all-minilm", "prompt": text},
+                timeout=2.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "embedding" in data:
+                    return data["embedding"]
+        except Exception:
+            pass
+        return [0.0] * 384
         
         # Khởi tạo Chroma client (local persistent)
         self.client = chromadb.PersistentClient(path=db_path)
@@ -125,8 +140,10 @@ class DiseaseIndexer:
                     }
                     
                     # Thêm vào collection
+                    embedding = self._get_embedding(chunk)
                     self.collection.add(
                         ids=[chunk_id],
+                        embeddings=[embedding],
                         documents=[chunk],
                         metadatas=[metadata]
                     )

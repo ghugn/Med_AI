@@ -1,41 +1,43 @@
 """
-API backend - đã điều chỉnh cho dự án lớn.
-⚡ Tối ưu bộ nhớ: nạp lười, cache, thu gom rác.
+MedPilot-Core API — Synced with Next.js Frontend
+3 endpoints: POST /api/scribe, POST /api/reminder, POST /api/chat
+Mode: MOCK DATA with QnA DEMO (trả về dữ liệu demo ngay lập tức)
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from datetime import datetime
 import time
-import gc  # ⚡ Garbage collection
-
-from app.config import settings
-from app.schemas import (
-    QueryRequest, QueryResponse, HealthResponse,
-    StatsResponse, ReloadResponse, RoleSelectionResponse,
-    ChatRequest, ChatResponse, DoctorQueryResponse
-)
-from app.rag_engine import RAGEngine
-from app.llm_service import LLMService
-from app import prompts
 import uuid
+from difflib import SequenceMatcher
 
-# Cấu hình logging
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+from app.schemas import (
+    ScribeRequest, ScribeResponse,
+    ReminderRequest, ReminderResponse,
+    ChatRequest, ChatResponse,
+    PatientInfo, ClinicalInfo, StructuredSummary,
+    PatientInput, DoctorApproveInput, APIResponse,
 )
+import app.db as db
+from datetime import datetime
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOGGING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+logging.basicConfig(level="INFO", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# ============ KHỞI TẠO FASTAPI ============
+# ═══════════════════════════════════════════════════════════════════════════════
+# APP
+# ═══════════════════════════════════════════════════════════════════════════════
+
 app = FastAPI(
-    title="MedPilot RAG Backend",
-    description="Complete RAG + LLM System - Memory Optimized",
-    version="1.0"
+    title="MedPilot Core API",
+    description="Backend cho frontend MedPilot — Scribe, Reminder, Chat (MOCK + QnA DEMO)",
+    version="2.0",
 )
 
-# CORS cho phép frontend hoặc công cụ khác gọi API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,400 +46,493 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============ KHỞI TẠO DỊCH VỤ ============
-logger.info("🚀 Initializing services...\n")
+logger.info("✅ Backend ready! (MOCK + QnA DEMO MODE)")
 
-# ⚡ Bật cơ chế thu gom rác mạnh tay
-gc.enable()
-gc.set_threshold(settings.GC_INTERVAL or 1000)  # ⚡ Dọn rác mạnh tay
-logger.info(f"🧹 Ngưỡng GC được đặt thành {settings.GC_INTERVAL or 1000} lần cấp phát")
+# Khởi tạo Database cho Case Management
+db.init_db()
 
-# RAG Engine (bản JSON) - ⚡ Có nạp lười và cache
-rag_engine = RAGEngine(
-    diseases_json=settings.DISEASES_JSON,
-    db_path=settings.DB_PATH,
-    embedding_model=settings.EMBEDDING_MODEL,
-    top_k=settings.TOP_K,
-    cache_size=settings.MODEL_CACHE_SIZE  # ⚡ Cache embedding rất nhỏ
-)
+# ═══════════════════════════════════════════════════════════════════════════════
+# QnA DEMO DATA — from BỘ MẪU QnA DEMO CHO DỰ ÁN MEDPILOT.sty
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Dịch vụ LLM (có chế độ dự phòng nếu backend chưa sẵn sàng)
-llm_service = LLMService(
-    api_url=settings.LLM_API_URL,
-    model=settings.VLLM_MODEL,
-    timeout=settings.TIMEOUT
-)
+# Chế độ Bệnh nhân — tất cả QnA pairs (Phần 1 + Phần 3)
+PATIENT_QNA = [
+    # ── Phần 1: 5 QnA hỏi đáp ──
+    {
+        "question": "Dạo gần đây da tay tôi bị ngứa và hơi đỏ, nguyên nhân có thể do đâu?",
+        "keywords": ["ngứa", "đỏ", "da tay", "nguyên nhân"],
+        "answer": "Ngứa và đỏ da tay có thể liên quan đến nhiều nguyên nhân khác nhau như kích ứng do xà phòng, nước rửa chén, viêm da tiếp xúc, da khô hoặc chàm. Một số trường hợp cũng có thể liên quan đến dị ứng hoặc các bệnh da liễu khác. Nếu tình trạng kéo dài, tái đi tái lại, lan rộng hoặc gây khó chịu nhiều, bạn nên đi khám bác sĩ da liễu để được đánh giá chính xác. Thông tin này chỉ mang tính tham khảo, không thay thế chẩn đoán của bác sĩ.",
+        "safety_notice": "Thông tin chỉ mang tính tham khảo, không thay thế chẩn đoán của bác sĩ.",
+        "possible_topics": ["Viêm da tiếp xúc", "Da khô", "Chàm", "Dị ứng da"],
+        "when_to_seek_care": ["Tình trạng kéo dài, tái đi tái lại", "Lan rộng hoặc gây khó chịu nhiều"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Nếu tôi bị như vậy khoảng 2 tuần rồi thì có đáng lo không?",
+        "keywords": ["2 tuần", "đáng lo", "kéo dài"],
+        "answer": "Nếu triệu chứng kéo dài khoảng 2 tuần mà chưa cải thiện thì bạn nên theo dõi kỹ hơn. Trường hợp ngứa nhiều, ảnh hưởng sinh hoạt, vùng da tổn thương lan rộng hoặc không đỡ sau khi tự chăm sóc cơ bản thì nên đi khám bác sĩ da liễu. Nếu có thêm các dấu hiệu như sưng đau rõ, chảy dịch, nổi bóng nước nhiều, sốt hoặc mệt thì càng nên đi khám sớm. Việc đánh giá trực tiếp sẽ giúp xác định nguyên nhân rõ hơn.",
+        "safety_notice": "Triệu chứng kéo dài 2 tuần nên được bác sĩ đánh giá.",
+        "possible_topics": ["Theo dõi triệu chứng", "Khi nào cần khám"],
+        "when_to_seek_care": ["Ngứa nhiều ảnh hưởng sinh hoạt", "Tổn thương lan rộng", "Sưng đau, chảy dịch, nổi bóng nước, sốt"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Tôi thấy mỗi lần rửa chén xong thì ngứa hơn, như vậy có liên quan không?",
+        "keywords": ["rửa chén", "ngứa hơn", "liên quan", "nước rửa chén"],
+        "answer": "Điều đó có thể có liên quan. Một số chất tẩy rửa hoặc việc tiếp xúc nước nhiều lần có thể làm da bị kích ứng hoặc làm nặng thêm tình trạng viêm da sẵn có. Nếu bạn thấy ngứa tăng rõ sau khi rửa chén hoặc tiếp xúc nước rửa chén thì đây là một yếu tố nên chú ý. Bạn có thể thử hạn chế tiếp xúc trực tiếp, dùng găng tay phù hợp, rửa tay nhẹ nhàng và dưỡng ẩm sau khi tiếp xúc. Tuy nhiên, để xác định nguyên nhân cụ thể vẫn cần bác sĩ đánh giá trực tiếp.",
+        "safety_notice": "Tiếp xúc chất tẩy rửa có thể làm nặng thêm tình trạng da.",
+        "possible_topics": ["Viêm da tiếp xúc kích ứng", "Chất tẩy rửa", "Bảo vệ da tay"],
+        "when_to_seek_care": ["Ngứa tăng rõ sau tiếp xúc hóa chất", "Tình trạng không cải thiện sau tự chăm sóc"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Tôi có thể tự mua thuốc bôi ở tiệm thuốc được không?",
+        "keywords": ["mua thuốc", "thuốc bôi", "tiệm thuốc", "tự mua"],
+        "answer": "Bạn không nên tự dùng thuốc bôi kéo dài nếu chưa rõ nguyên nhân, đặc biệt là các thuốc có chứa corticoid vì nếu dùng không đúng có thể làm tình trạng da nặng hơn hoặc che lấp triệu chứng thật. Trong lúc chờ đi khám, bạn có thể chăm sóc cơ bản như tránh chất kích ứng, giữ da sạch nhẹ nhàng và dùng kem dưỡng ẩm phù hợp. Nếu tổn thương không cải thiện hoặc nặng hơn, bạn nên đi khám bác sĩ da liễu để được hướng dẫn đúng.",
+        "safety_notice": "⚠️ KHÔNG nên tự mua thuốc bôi, đặc biệt corticoid, khi chưa có chẩn đoán.",
+        "possible_topics": ["An toàn dùng thuốc", "Corticoid", "Chăm sóc da cơ bản"],
+        "when_to_seek_care": ["Tổn thương không cải thiện hoặc nặng hơn sau tự chăm sóc"],
+        "red_flag_advice": ["Không tự dùng thuốc corticoid kéo dài — có thể làm nặng hơn hoặc che lấp triệu chứng"],
+        "confidence_level": "high",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Khi nào thì tôi cần đi khám ngay?",
+        "keywords": ["khi nào", "khám ngay", "đi khám", "cần khám"],
+        "answer": "Bạn nên đi khám sớm nếu có một trong các dấu hiệu sau: tổn thương lan nhanh, đau nhiều, sưng nhiều, chảy dịch, chảy máu, nổi bóng nước nhiều, ngứa quá mức ảnh hưởng sinh hoạt, hoặc kèm sốt, mệt rõ. Nếu có khó thở, sưng môi hoặc lưỡi, choáng, hay phản ứng toàn thân thì cần đến cơ sở y tế ngay. Chatbot chỉ hỗ trợ thông tin tham khảo, không thay thế bác sĩ.",
+        "safety_notice": "Nếu có triệu chứng nặng, hãy đến cơ sở y tế ngay.",
+        "possible_topics": ["Dấu hiệu nguy hiểm", "Khi nào cần cấp cứu"],
+        "when_to_seek_care": [
+            "Tổn thương lan nhanh, đau nhiều, sưng nhiều",
+            "Chảy dịch, chảy máu, nổi bóng nước nhiều",
+            "Ngứa quá mức ảnh hưởng sinh hoạt, sốt, mệt",
+        ],
+        "red_flag_advice": [
+            "Khó thở, sưng môi/lưỡi, choáng → đến cơ sở y tế NGAY",
+        ],
+        "confidence_level": "high",
+        "requires_emergency_care": False,
+    },
 
-# Nạp danh sách bệnh ngay khi khởi động
-logger.info("📂 Loading diseases from JSON...")
-diseases = rag_engine.load_diseases_from_json()
-
-if diseases:
-    logger.info(f"📊 Found {len(diseases)} diseases - will index on first query")
-    # Không index ngay để tiết kiệm bộ nhớ, chỉ index khi cần
-else:
-    logger.warning("⚠️  No diseases loaded!")
-    logger.warning("   Run: python convert_text_to_json.py")
-
-logger.info("✅ Backend ready!\n")
-
-# ============ TIỆN ÍCH ============
-# Bộ đếm request để quản lý bộ nhớ
-request_counter = {"count": 0}
-
-def cleanup_request():
-    """Dọn dẹp sau mỗi request."""
-    request_counter["count"] += 1
-    if request_counter["count"] % 5 == 0:  # Mỗi 5 request
-        logger.debug(f"🧹 Dọn GC mạnh tay (request #{request_counter['count']})")
-        gc.collect()
-        gc.collect()  # Gọi thu gom hai lần cho sạch hơn
-
-# Lịch sử hội thoại lưu trong bộ nhớ (demo; bản thật nên dùng database)
-conversation_history = {}
-
-def is_dermatology_question(user_message: str) -> bool:
-    """
-    Kiểm tra câu hỏi của người dùng có thuộc phạm vi da liễu hay không.
-    Dùng so khớp theo từ khóa.
-    """
-    # Danh sách từ khóa cho chủ đề da liễu
-    derm_keywords = [
-        "da", "mụn", "nổi đỏ", "ngứa", "khô", "chàm", "gàu", "nấm", 
-        "vêu", "mụn rộp", "mụn cóc", "sẹo", "chân nấm", "lang ben",
-        "viêm da", "dị ứng da", "tổn thương da", "bệnh da", "skin",
-        "rash", "acne", "eczema", "psoriasis", "fungal", "dermatitis",
-        "hôi nách", "mồ hôi", "nám da", "bạch biến", "bệnh lý da",
-        "móng", "tóc", "dưỡng ẩm", "mỹ phẩm", "chống nắng", "sun",
-        "chế độ chăm sóc", "làm sạch", "rửa mặt", "mặt nạ"
-    ]
+    # ── Phần 3: 5 lượt hội thoại tự nhiên bệnh nhân ──
+    {
+        "question": "Da tay tôi bị ngứa và đỏ khoảng 2 tuần nay, tôi nên nghĩ đến vấn đề gì?",
+        "keywords": ["da tay", "ngứa", "đỏ", "2 tuần", "vấn đề gì"],
+        "answer": "Ngứa và đỏ da tay kéo dài 2 tuần có thể liên quan đến kích ứng, viêm da tiếp xúc, da khô hoặc chàm. Nếu tình trạng không cải thiện, lan rộng hoặc tái phát nhiều lần thì bạn nên đi khám bác sĩ da liễu để được đánh giá chính xác. Đây chỉ là thông tin tham khảo.",
+        "safety_notice": "Thông tin chỉ mang tính tham khảo.",
+        "possible_topics": ["Kích ứng da", "Viêm da tiếp xúc", "Da khô", "Chàm"],
+        "when_to_seek_care": ["Không cải thiện", "Lan rộng", "Tái phát nhiều lần"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Tôi thấy sau khi rửa chén xong thì ngứa hơn nhiều.",
+        "keywords": ["rửa chén", "ngứa hơn nhiều"],
+        "answer": "Điều đó có thể gợi ý da của bạn đang bị kích ứng bởi nước rửa chén hoặc việc tiếp xúc nước quá thường xuyên. Bạn nên hạn chế tiếp xúc trực tiếp, có thể dùng găng tay phù hợp và dưỡng ẩm sau đó. Tuy nhiên, để biết chính xác nguyên nhân vẫn cần bác sĩ đánh giá.",
+        "safety_notice": "Hạn chế tiếp xúc trực tiếp với chất tẩy rửa.",
+        "possible_topics": ["Kích ứng da do hóa chất", "Bảo vệ da tay"],
+        "when_to_seek_care": ["Tình trạng không cải thiện sau khi hạn chế tiếp xúc"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Tôi có cần mua thuốc bôi không?",
+        "keywords": ["mua thuốc bôi", "cần mua", "thuốc"],
+        "answer": "Bạn không nên tự ý dùng thuốc bôi kéo dài nếu chưa rõ nguyên nhân, nhất là thuốc chứa corticoid. Bạn có thể chăm sóc cơ bản bằng cách tránh chất kích ứng và dưỡng ẩm. Nếu không đỡ, nên đi khám bác sĩ da liễu.",
+        "safety_notice": "⚠️ KHÔNG tự ý dùng thuốc bôi kéo dài, đặc biệt corticoid.",
+        "possible_topics": ["An toàn dùng thuốc", "Chăm sóc cơ bản"],
+        "when_to_seek_care": ["Không đỡ sau chăm sóc cơ bản"],
+        "red_flag_advice": ["Không tự dùng thuốc corticoid"],
+        "confidence_level": "high",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Nếu tôi chưa đi khám ngay thì cần theo dõi gì?",
+        "keywords": ["chưa đi khám", "theo dõi", "cần theo dõi"],
+        "answer": "Bạn nên theo dõi xem tổn thương có lan rộng hơn không, có chảy dịch, chảy máu, đau, nổi bóng nước hoặc ảnh hưởng sinh hoạt nhiều không. Nếu có các dấu hiệu đó thì nên đi khám sớm hơn.",
+        "safety_notice": "Theo dõi các dấu hiệu diễn tiến nặng.",
+        "possible_topics": ["Theo dõi triệu chứng", "Dấu hiệu cần khám"],
+        "when_to_seek_care": ["Lan rộng", "Chảy dịch/máu", "Đau tăng", "Nổi bóng nước", "Ảnh hưởng sinh hoạt"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Khi nào là mức phải đi khám ngay?",
+        "keywords": ["mức phải", "khám ngay", "khi nào"],
+        "answer": "Bạn nên đi khám ngay nếu tổn thương lan nhanh, đau nhiều, sưng nhiều, chảy dịch, sốt, nổi bóng nước nhiều hoặc có biểu hiện toàn thân. Nếu có khó thở, sưng môi lưỡi hoặc phản ứng nặng thì cần đến cơ sở y tế ngay.",
+        "safety_notice": "⚠️ Các triệu chứng nặng cần đến cơ sở y tế NGAY.",
+        "possible_topics": ["Dấu hiệu nguy hiểm", "Cấp cứu da liễu"],
+        "when_to_seek_care": ["Tổn thương lan nhanh", "Đau/sưng nhiều", "Chảy dịch, sốt", "Bóng nước nhiều"],
+        "red_flag_advice": ["Khó thở, sưng môi lưỡi, phản ứng nặng → cơ sở y tế NGAY"],
+        "confidence_level": "high",
+        "requires_emergency_care": False,
+    },
     
-    # Kiểm tra xem có từ khóa nào xuất hiện trong nội dung không
-    message_lower = user_message.lower()
-    for keyword in derm_keywords:
-        if keyword in message_lower:
-            return True
-    
-    # Nếu không khớp từ khóa nào thì coi là ngoài phạm vi
-    return False
+    # ── Bổ sung các câu hỏi gợi ý từ Frontend ──
+    {
+        "question": "Kem bôi da nào an toàn?",
+        "keywords": ["kem bôi", "an toàn", "loại nào"],
+        "answer": "Việc lựa chọn kem bôi da phụ thuộc vào tình trạng cụ thể của bạn (da khô, viêm da, nhiễm nấm, v.v.). Các loại kem dưỡng ẩm cơ bản, không mùi, không chứa cồn (như Vaseline, Cetaphil, Cerave) thường an toàn để sử dụng hàng ngày. Tuy nhiên, đối với các loại kem đặc trị chứa thành phần như Corticoid, kháng sinh hoặc thuốc chống nấm, bạn TUYỆT ĐỐI không nên tự ý sử dụng mà cần có sự kê đơn và hướng dẫn của bác sĩ da liễu để tránh các tác dụng phụ nghiêm trọng.",
+        "safety_notice": "Không tự ý dùng thuốc bôi đặc trị khi chưa có chỉ định của bác sĩ.",
+        "possible_topics": ["Chăm sóc da an toàn", "Kem dưỡng ẩm", "Tác dụng phụ của Corticoid"],
+        "when_to_seek_care": ["Triệu chứng không cải thiện với kem dưỡng ẩm cơ bản"],
+        "red_flag_advice": ["Tránh lạm dụng kem bôi không rõ nguồn gốc hoặc tự chế"],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Dấu hiệu nhiễm nấm da?",
+        "keywords": ["dấu hiệu", "nấm da", "nhiễm nấm"],
+        "answer": "Nhiễm nấm da thường có các dấu hiệu đặc trưng như: xuất hiện các mảng ban đỏ có hình tròn hoặc bầu dục, bong vảy ở rìa tổn thương, thường kèm theo ngứa nhiều (đặc biệt khi ra mồ hôi). Tổn thương thường thấy ở các vùng da ẩm ướt, có nếp gấp như bẹn, kẽ ngón chân, nách. Tuy nhiên, chẩn đoán chính xác nấm da cần có cái nhìn chuyên môn từ bác sĩ da liễu và đôi khi cần làm xét nghiệm soi nấm trực tiếp. Bạn không nên tự dùng thuốc trị nấm vì có thể làm bệnh khó chữa hơn.",
+        "safety_notice": "Cần khám và xét nghiệm để chẩn đoán chính xác nấm da.",
+        "possible_topics": ["Nhiễm nấm (Hắc lào, Lang ben)", "Vệ sinh da"],
+        "when_to_seek_care": ["Nghi ngờ nhiễm nấm", "Ngứa nhiều, tổn thương lan rộng"],
+        "red_flag_advice": [],
+        "confidence_level": "medium",
+        "requires_emergency_care": False,
+    },
+    {
+        "question": "Viêm da tiếp xúc là gì?",
+        "keywords": ["viêm da", "tiếp xúc", "là gì"],
+        "answer": "Viêm da tiếp xúc là một tình trạng phát ban tấy đỏ, ngứa ngáy xảy ra khi da của bạn tiếp xúc trực tiếp với một chất gây kích ứng hoặc dị ứng. Có hai loại chính: Viêm da tiếp xúc kích ứng (do các chất như xà phòng mạnh, thuốc tẩy, acid...) tổn thương vùng da tiếp xúc; và Viêm da tiếp xúc dị ứng (do kim loại, mỹ phẩm, mủ cao su...) liên quan đến hệ miễn dịch. Bệnh không lây nhiễm nhưng gây khó chịu. Cách điều trị tốt nhất là xác định và tránh xa tác nhân gây bệnh.",
+        "safety_notice": "Xác định đúng tác nhân gây bệnh là bước quan trọng nhất.",
+        "possible_topics": ["Viêm da kích ứng", "Viêm da dị ứng", "Patch test"],
+        "when_to_seek_care": ["Phát ban không cải thiện sau khi tránh tác nhân nghi ngờ", "Phát ban lan rộng lên mặt, sinh dục"],
+        "red_flag_advice": [],
+        "confidence_level": "high",
+        "requires_emergency_care": False,
+    },
+]
+
+# Câu trả lời mặc định khi không khớp câu hỏi nào
+DEFAULT_PATIENT_ANSWER = {
+    "answer": (
+        "Xin chào! Tôi là trợ lý Da liễu AI. Dựa trên mô tả của bạn, tình trạng này "
+        "**CÓ THỂ** liên quan đến một số vấn đề da liễu thường gặp.\n\n"
+        "**Những gì bạn có thể làm:**\n"
+        "- Giữ vùng da sạch sẽ và khô thoáng\n"
+        "- Tránh gãi hoặc chà xát lên vùng da bị ảnh hưởng\n"
+        "- Sử dụng kem dưỡng ẩm nhẹ, không mùi\n"
+        "- Tránh tiếp xúc với xà phòng mạnh hoặc hóa chất\n\n"
+        "⚠️ **QUAN TRỌNG:** Thông tin trên chỉ mang tính tham khảo. "
+        "Vui lòng **đi khám bác sĩ da liễu** để được chẩn đoán và điều trị chính xác. "
+        "**TUYỆT ĐỐI KHÔNG TỰ MUA THUỐC** mà chưa có đơn của bác sĩ!"
+    ),
+    "safety_notice": "Thông tin chỉ mang tính tham khảo, không thay thế chẩn đoán của bác sĩ.",
+    "possible_topics": ["Viêm da", "Chàm", "Dị ứng da", "Nấm da"],
+    "when_to_seek_care": [
+        "Triệu chứng kéo dài hơn 2 tuần không cải thiện",
+        "Xuất hiện mụn mủ hoặc dấu hiệu nhiễm trùng",
+        "Tổn thương lan rộng nhanh",
+    ],
+    "red_flag_advice": [],
+    "confidence_level": "medium",
+    "requires_emergency_care": False,
+}
 
 
-def check_medication_intent(user_message: str) -> bool:
-    """
-    Phát hiện người dùng có ý định mua thuốc mà chưa tham khảo bác sĩ hay không.
-    """
-    medication_keywords = [
-        "mua thuốc", "mua kem", "mua dung dịch", "mua gel",
-        "thuốc gì", "kem nào", "dung dịch nào", "gel nào",
-        "bôi cái gì", "uống cái gì", "tiêm cái gì",
-        "ở đâu mua", "bán ở đâu", "nhà thuốc", "hiệu thuốc",
-        "liều lượng", "dùng bao nhiêu", "bôi bao nhiêu",
-        "tự mua", "tự dùng", "tự bôi", "tự uống",
-        "có được bán không", "bán không", "giá bao nhiêu"
-    ]
-    
-    message_lower = user_message.lower()
-    
-    for keyword in medication_keywords:
-        if keyword in message_lower:
-            # Double check it's not just a question about medication in general
-            # (e.g., "what is this medicine?")
-            if any(x in message_lower for x in ["gì", "nào", "bao nhiêu", "ở đâu", "mua", "bôi", "uống", "dùng"]):
-                return True
-    
-    return False
+def _find_best_match(question: str, qna_list: list, threshold: float = 0.55) -> dict | None:
+    """Tìm câu hỏi khớp nhất bằng keyword matching + fuzzy similarity."""
+    question_lower = question.lower().strip()
+    best_score = 0.0
+    best_match = None
 
-# ============ ENDPOINTS ============
+    for qna in qna_list:
+        # Fuzzy similarity score
+        similarity = SequenceMatcher(None, question_lower, qna["question"].lower()).ratio()
 
-@app.get("/api/v1/ask-role", response_model=RoleSelectionResponse)
-async def ask_user_role():
-    """🚀 Hỏi user là bác sĩ hay bệnh nhân - ENDPOINT ĐẦU TIÊN"""
-    
-    message = """👋 Xin chào! Chào mừng đến với MedPilot - Trợ lý AI Hỗ Trợ Chẩn Đoán Da Liễu
+        # Keyword bonus: mỗi keyword khớp +0.15
+        keyword_bonus = sum(
+            0.15 for kw in qna["keywords"] if kw.lower() in question_lower
+        )
 
-Để có thể giúp bạn tốt nhất, vui lòng cho biết bạn là:
+        total_score = similarity + keyword_bonus
 
-**1️⃣ BÁC SĨ** - Tôi sẽ cung cấp gợi ý chẩn đoán chi tiết từ kho tri thức y tế
-**2️⃣ BỆNH NHÂN** - Tôi sẽ trả lời Q&A thân thiện và hướng dẫn bạn tới bác sĩ
+        if total_score > best_score:
+            best_score = total_score
+            best_match = qna
 
-👉 Vui lòng gửi request tới /api/v1/query với {"query": "...", "user_role": "doctor"} hoặc {"user_role": "patient"}"""
-    
-    logger.info(f"📋 Role selection requested\n")
-    
-    return RoleSelectionResponse(
-        message=message,
-        options=["doctor", "patient"],
-        timestamp=datetime.now()
+    if best_score >= threshold and best_match:
+        logger.info(f"[QnA Match] score={best_score:.2f} matched='{best_match['question'][:50]}...'")
+        return best_match
+
+    logger.info(f"[QnA Match] No match (best_score={best_score:.2f}), using default")
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/scribe — Medical Scribe (MOCK)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/scribe", response_model=ScribeResponse, tags=["Scribe"])
+async def scribe_endpoint(req: ScribeRequest):
+    """Trích xuất thông tin lâm sàng từ transcript (dữ liệu demo)."""
+    logger.info(f"[Scribe] MOCK request_id={req.request_id}")
+    start = time.time()
+
+    transcript = req.transcript or ""
+    if not transcript.strip():
+        logger.info("[Scribe] Nhận transcript trống, tự động gán Mock Audio Transcript.")
+        transcript = "[AUDIO MOCK] Bệnh nhân than phiền nổi đỏ ngứa bong vảy hai bàn tay 2 tuần nay."
+
+    response = ScribeResponse(
+        request_id=req.request_id or f"req_scribe_{uuid.uuid4().hex[:8]}",
+        schema_version=req.schema_version,
+        patient_info=req.patient_info,
+        clinical_info=ClinicalInfo(
+            chief_complaint="Nổi đỏ, ngứa nhiều, bong vảy nhẹ ở hai bàn tay",
+            symptoms=["Nổi đỏ", "Ngứa nhiều", "Bong vảy nhẹ"],
+            duration="Khoảng 2 tuần",
+            onset="Ban đầu hơi đỏ ở mu bàn tay, sau vài ngày ngứa nhiều hơn và lan ra cổ tay",
+            lesion_location=["Hai bàn tay", "Cổ tay"],
+            lesion_distribution="Hai bên, tay phải nặng hơn",
+            itching=True,
+            pain=False,
+            burning=None,
+            scaling=True,
+            blister=False,
+            discharge=False,
+            bleeding=False,
+            spreading_pattern="Lan từ mu bàn tay ra cổ tay",
+            trigger_factors=["Rửa chén nhiều", "Tiếp xúc nước rửa chén"],
+            previous_treatment=["Bôi kem không rõ tên, cải thiện ít"],
+            history_update=["Từng bị viêm da cơ địa khoảng 2 năm trước"],
+            allergy_update=[],
+            medication_update=[],
+            current_notes="Bệnh nhân cho biết triệu chứng nặng hơn khi tiếp xúc nước rửa chén.",
+        ),
+        structured_summary=StructuredSummary(
+            one_liner="Nổi đỏ, ngứa nhiều, bong vảy nhẹ hai bàn tay 2 tuần, tay phải nặng hơn, tiền sử viêm da cơ địa",
+            important_findings=[
+                "Tổn thương hai bên, tay phải nặng hơn",
+                "Triệu chứng tăng khi tiếp xúc nước rửa chén",
+                "Tiền sử viêm da cơ địa 2 năm trước",
+                "Bong vảy nhẹ kèm ngứa nhiều",
+            ],
+            negative_findings=[
+                "Không sốt, không mệt",
+                "Không chảy dịch, không chảy máu",
+                "Không đau",
+                "Không mụn nước",
+            ],
+            missing_required_fields=["burning", "allergy_update", "previous_treatment (tên thuốc cụ thể)"],
+        ),
+        draft_note=(
+            "Bệnh nhân đến khám vì nổi đỏ, ngứa nhiều, bong vảy nhẹ ở hai bàn tay kéo dài khoảng 2 tuần. "
+            "Khởi phát ban đầu hơi đỏ ở mu bàn tay, sau vài ngày ngứa nhiều hơn và lan ra cổ tay. "
+            "Tổn thương hai bên, tay phải nặng hơn. Bệnh nhân có ngứa nhiều, bong vảy nhẹ, không đau. "
+            "Yếu tố khởi phát: rửa chén nhiều, tiếp xúc nước rửa chén. "
+            "Tiền sử: từng bị viêm da cơ địa khoảng 2 năm trước. "
+            "Đã bôi kem không rõ tên, cải thiện ít. "
+            "Không sốt, không mệt, không chảy dịch, không chảy máu, không mụn nước. "
+            "Chưa rõ cảm giác rát, chưa rõ tiền sử dị ứng."
+        ),
+        missing_required_fields=["burning", "allergy_update", "previous_treatment (tên thuốc cụ thể)"],
+        uncertain_fields=["burning", "allergy_update", "previous_treatment"],
+        requires_doctor_approval=True,
+        field_confidence={
+            "chief_complaint": 0.95,
+            "symptoms": 0.92,
+            "duration": 0.88,
+            "onset": 0.85,
+            "lesion_location": 0.90,
+            "trigger_factors": 0.85,
+            "history_update": 0.80,
+        },
+        latency_ms=round((time.time() - start) * 1000, 1),
+        model_version="demo_v1",
     )
 
-@app.post("/api/v1/query", response_model=QueryResponse)
-async def query(req: QueryRequest, role: str = Query(None)):
-    """
-    🩺 RAG Query Endpoint - Supports both doctor and patient modes
-    
-    Query parameters:
-    - role=doctor → Doctor diagnostic mode (detailed, technical)
-    - role=patient → Patient education mode (simple, no diagnosis)
-    - If role not specified, defaults to patient (safer)
-    """
+    logger.info(f"[Scribe] MOCK done in {response.latency_ms}ms")
+    return response
 
-    logger.info(f"\n{'='*60}")
-    logger.info(f"❓ QUERY: {req.query[:80]}...")
-    
-    # Determine role - from request body or query param, default to patient
-    user_role = (role or req.user_role or "patient").lower()
-    
-    if user_role not in ["doctor", "patient"]:
-        raise HTTPException(status_code=400, detail='role must be "doctor" or "patient"')
-    
-    logger.info(f"👤 ROLE: {user_role.upper()}")
-    logger.info(f"{'='*60}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/reminder — Clinical Reminder (MOCK)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/reminder", response_model=ReminderResponse, tags=["Reminder"])
+async def reminder_endpoint(req: ReminderRequest):
+    """Phân tích hồ sơ lâm sàng và tạo nhắc nhở (dữ liệu demo)."""
+    logger.info(f"[Reminder] MOCK request_id={req.request_id}")
+    start = time.time()
+
+    response = ReminderResponse(
+        request_id=req.request_id or f"req_reminder_{uuid.uuid4().hex[:8]}",
+        missing_critical_info=[
+            "Chưa rõ cảm giác rát (burning) có hay không",
+            "Chưa rõ tiền sử dị ứng cá nhân hoặc gia đình",
+            "Chưa biết tên kem đã bôi trước đó",
+            "Chưa khai thác có dùng găng tay khi rửa chén hay không",
+        ],
+        questions_to_ask=[
+            "Thời điểm bắt đầu rửa chén nhiều hơn có trùng với lúc khởi phát tổn thương không?",
+            "Bệnh nhân có dùng găng tay không, nếu có thì là loại nào?",
+            "Ngoài nước rửa chén còn tiếp xúc với mỹ phẩm, chất tẩy khác, kim loại hoặc chất mới nào không?",
+            "Có tiền sử hen, viêm mũi dị ứng, chàm hoặc cơ địa dị ứng không?",
+            "Loại kem đã bôi trước đó là gì, có còn vỏ thuốc hoặc nhớ thành phần nào không?",
+            "Có cảm giác rát, châm chích, nóng da hoặc nứt da không?",
+            "Mức độ ảnh hưởng sinh hoạt hằng ngày như thế nào?",
+        ],
+        red_flags=[
+            "Hiện chưa có red flags rõ rệt (không sốt, không đau, không chảy dịch, không triệu chứng toàn thân)",
+            "Cần khám trực tiếp để đánh giá nguy cơ bội nhiễm và mức độ viêm thực tế",
+        ],
+        possible_considerations=[
+            "Viêm da tiếp xúc kích ứng — tổn thương ở bàn tay, triệu chứng tăng khi tiếp xúc nước rửa chén",
+            "Viêm da tiếp xúc dị ứng — cần loại trừ nếu có yếu tố tiếp xúc dị ứng nguyên cụ thể",
+            "Đợt bùng phát viêm da cơ địa — có tiền sử viêm da cơ địa 2 năm trước",
+        ],
+        suggested_next_checks=[
+            "Khám trực tiếp hình thái tổn thương — đánh giá nứt, dày da, lichen hóa",
+            "Patch test (thử nghiệm áp da) nếu nghi viêm da tiếp xúc dị ứng",
+            "Khai thác thêm tiền sử cơ địa dị ứng để hỗ trợ phân biệt",
+        ],
+        guideline_evidence=[
+            "Hướng dẫn BAD (British Association of Dermatologists) về viêm da tiếp xúc",
+            "Khuyến cáo AAD về quản lý viêm da cơ địa ở người lớn",
+        ],
+        latency_ms=round((time.time() - start) * 1000, 1),
+        model_version="demo_v1",
+    )
+
+    logger.info(f"[Reminder] MOCK done in {response.latency_ms}ms")
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POST /api/chat — Patient QnA Chatbot (QnA DEMO)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_EMERGENCY_KEYWORDS = ["khó thở", "sưng môi", "sưng lưỡi", "ngất", "sốc", "cấp cứu", "phản vệ"]
+
+_EMERGENCY_RESPONSE = {
+    "answer": (
+        "🚨 **CẢNH BÁO KHẨN CẤP!**\n\n"
+        "Dựa trên mô tả của bạn, tình trạng này CÓ THỂ cần được xử lý y tế ngay lập tức.\n\n"
+        "**Hãy đến phòng cấp cứu NGAY nếu bạn có:**\n"
+        "- Khó thở, sưng mặt/môi/lưỡi\n"
+        "- Phát ban lan nhanh toàn thân\n"
+        "- Sốt cao kèm phát ban\n"
+        "- Chóng mặt, ngất xỉu\n\n"
+        "📞 **Gọi 115 ngay** nếu có bất kỳ triệu chứng nào ở trên!"
+    ),
+    "safety_notice": "⚠️ Đây CÓ THỂ là tình huống khẩn cấp. Hãy đến bệnh viện NGAY.",
+    "possible_topics": ["Dị ứng cấp tính", "Phản vệ", "Nhiễm trùng nặng"],
+    "when_to_seek_care": ["NGAY LẬP TỨC — không nên chờ đợi"],
+    "red_flag_advice": [
+        "Khó thở hoặc sưng phù → gọi cấp cứu 115",
+        "Sốt cao > 39°C kèm phát ban → đến bệnh viện ngay",
+    ],
+    "confidence_level": "high",
+    "requires_emergency_care": True,
+}
+
+
+@app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
+async def chat_endpoint(req: ChatRequest):
+    """Hỏi đáp da liễu cho bệnh nhân — sử dụng bộ QnA DEMO."""
+    logger.info(f"[Chat] QnA DEMO question='{req.question[:60]}...'")
+    start = time.time()
+
+    question_lower = req.question.lower()
+
+    # 1. Check emergency keywords
+    is_emergency = any(kw in question_lower for kw in _EMERGENCY_KEYWORDS)
+    if is_emergency:
+        data = _EMERGENCY_RESPONSE
+        logger.info("[Chat] Emergency keywords detected")
+    else:
+        # 2. Find best matching QnA
+        match = _find_best_match(req.question, PATIENT_QNA)
+        data = match if match else DEFAULT_PATIENT_ANSWER
+
+    response = ChatResponse(
+        request_id=req.request_id or f"req_chat_{uuid.uuid4().hex[:8]}",
+        question=req.question,
+        answer=data["answer"],
+        safety_notice=data.get("safety_notice", ""),
+        possible_topics=data.get("possible_topics", []),
+        when_to_seek_care=data.get("when_to_seek_care", []),
+        red_flag_advice=data.get("red_flag_advice", []),
+        source_evidence=data.get("source_evidence", ["Cơ sở dữ liệu DermNet Vietnamese"]),
+        confidence_level=data.get("confidence_level", "medium"),
+        requires_doctor_followup=True,
+        requires_emergency_care=data.get("requires_emergency_care", False),
+        latency_ms=round((time.time() - start) * 1000, 1),
+        model_version="demo_v1",
+    )
+
+    logger.info(f"[Chat] Done in {response.latency_ms}ms")
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/health
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/health", tags=["Health"])
+async def health():
+    return {"status": "ok", "mode": "demo_qna", "patient_qna_count": len(PATIENT_QNA)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Triage Endpoints (Consolidated into Core)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/v1/cases/create", summary="Tạo ca bệnh mới", response_model=APIResponse, tags=["Cases"])
+async def create_case_endpoint(patient: PatientInput):
+    logger.info(f"Khởi tạo ca mới cho bác sĩ {patient.bac_si_id}")
+
+    case_id = "CASE_" + str(uuid.uuid4())[:8].upper()
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    db_record = {
+        "Case_ID": case_id,
+        "Ngày_giờ_khám": current_time,
+        "Bác_sĩ_ID": patient.bac_si_id,
+        "Họ_tên_BN": patient.ho_ten,
+        "Tuổi": patient.tuoi,
+        "Giới_tính": patient.gioi_tinh,
+        "Triệu_chứng_Transcript": patient.trieu_chung_transcript,
+        "Safety_Status": "created"
+    }
+    await db.save_case(db_record)
+
+    return APIResponse(
+        success=True,
+        message="Ca bệnh đã được khởi tạo",
+        data={"case_id": case_id, "created_at": current_time}
+    )
+
+@app.post("/api/v1/cases/{case_id}/doctor-approve", summary="Bác sĩ phê duyệt", response_model=APIResponse, tags=["Cases"])
+async def doctor_approve_endpoint(case_id: str, payload: DoctorApproveInput):
+    logger.info(f"Bác sĩ phê duyệt cho case {case_id}")
 
     start_time = time.time()
+    update_data = {
+        "Draft_Note": payload.draft_note,
+        "Safety_Status": "approved_by_doctor",
+        "SpO2_Final": payload.spo2,
+        "HR_Final": payload.hr,
+        "BP_Final": payload.bp,
+        "Red_Flag": payload.red_flags,
+        "Uncertainty_Score": payload.uncertainty_score,
+    }
+    await db.update_case(case_id, update_data)
+    await db.log_ai_interaction(case_id, "/cases/doctor-approve", round(float(time.time() - start_time), 2), "None", "Approved")
 
-    try:
-        # Step 1: Retrieve relevant diseases
-        logger.info(f"🔍 Retrieving...")
-        top_k = req.top_k or (5 if user_role == "doctor" else 3)
-        retrieved = rag_engine.retrieve(req.query, top_k=top_k)
-
-        logger.info(f"✅ Retrieved {len(retrieved)} chunks")
-
-        # Step 2: Generate response based on role
-        logger.info(f"🤖 Generating answer ({user_role} mode)...")
-
-        # Build context from retrieved diseases
-        context = "\n\n".join([f"[{r['disease']}] {r['content']}" for r in retrieved])
-
-        # Select role-specific system prompt
-        if user_role == "doctor":
-            system_message = prompts.DOCTOR_MODE_SYSTEM_VI
-            max_tokens = req.max_tokens or 2000
-            temperature = req.temperature or 0.5  # Lower temp for accuracy
-            logger.info(f"👨‍⚕️  Doctor Mode - Detailed diagnostic support")
-        else:
-            system_message = prompts.PATIENT_MODE_SYSTEM_VI
-            max_tokens = req.max_tokens or 1000
-            temperature = req.temperature or 0.7
-            logger.info(f"🧑‍🤝‍🧑 Patient Mode - Educational Q&A")
-
-        # Append retrieved context to system message
-        full_system_message = f"""{system_message}
-
-**KHO TRI THỨC Y TẾ:**
-{context}"""
-
-        # Build messages for LLM
-        user_prompt = f"""Câu hỏi: {req.query}
-
-Vui lòng trả lời HOÀN TOÀN bằng TIẾNG VIỆT."""
-
-        messages = [
-            {"role": "system", "content": full_system_message},
-            {"role": "user", "content": user_prompt}
-        ]
-
-        # Step 3: Query LLM
-        result = llm_service.query(messages, max_tokens=max_tokens)
-
-        latency = time.time() - start_time
-
-        logger.info(f"✅ Done ({latency:.2f}s)")
-        
-        # ⚡ Cleanup memory
-        gc.collect()
-        cleanup_request()
-
-        return QueryResponse(
-            query=req.query,
-            answer=result.get("answer", "Xin lỗi, không thể tạo response."),
-            retrieved_chunks=len(retrieved),
-            latency=latency,
-            success=result.get("success", False)
-        )
-
-    except Exception as e:
-        error_msg = f"Query Error: {type(e).__name__} - {str(e)}"
-        logger.error(f"❌ {error_msg}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # ⚡ Cleanup even on error
-        gc.collect()
-        cleanup_request()
-        raise HTTPException(status_code=500, detail=error_msg)
-
-
-@app.post("/api/v1/chat", response_model=ChatResponse)
-async def patient_chat(req: ChatRequest):
-    """
-    💬 Patient Chat Endpoint - Continuous Q&A about dermatology
-    
-    Features:
-    - Continuous conversation history
-    - Dermatology scope checking
-    - Medication purchase warning detection
-    - Educational content only (no diagnosis)
-    """
-    
-    # Generate or use existing conversation ID
-    conv_id = req.conversation_id if req.conversation_id else str(uuid.uuid4())
-    
-    logger.info(f"\n{'='*60}")
-    logger.info(f"💬 CHAT: {req.message[:80]}...")
-    logger.info(f"👤 CONVERSATION: {conv_id}")
-    logger.info(f"{'='*60}")
-    
-    start_time = time.time()
-    
-    try:
-        # Initialize conversation if new
-        if conv_id not in conversation_history:
-            conversation_history[conv_id] = []
-            logger.info(f"📝 Created new conversation")
-        
-        # Check if question is about dermatology
-        is_derm = is_dermatology_question(req.message)
-        
-        logger.info(f"🔍 Question type: {'DERMATOLOGY' if is_derm else 'OUT OF SCOPE'}")
-        
-        # If out of scope, return polite refusal
-        if not is_derm:
-            logger.info(f"⛔ Question is outside dermatology scope")
-            
-            response_text = """Xin lỗi, tôi chỉ được đào tạo để trả lời các câu hỏi liên quan đến **da liễu**.
-
-Câu hỏi của bạn ngoài lĩnh vực chuyên môn của tôi. 
-
-Nếu bạn có bất kỳ câu hỏi nào về:
-- 🔬 Các bệnh da (mụn, chàm, nấm, viêm da,...)
-- 💆 Chăm sóc da (dưỡng ẩm, chống nắng, rửa mặt,...)
-- 🏥 Phòng ngừa và làm đẹp
-
-Tôi rất sẵn lòng giúp đỡ! Vui lòng hỏi lại về chủ đề liên quan đến da liễu."""
-            
-            latency = time.time() - start_time
-            
-            return ChatResponse(
-                message=response_text,
-                is_dermatology=False,
-                has_medication_warning=False,
-                conversation_id=conv_id,
-                retrieved_chunks=0,
-                latency=latency,
-                success=True
-            )
-        
-        # Check for medication purchase intent
-        has_med_warning = check_medication_intent(req.message)
-        
-        if has_med_warning:
-            logger.info(f"⚠️  Medication purchase intent detected!")
-            
-            response_text = """⚠️ **CẢNH BÁO QUAN TRỌNG** ⚠️
-
-Bạn không nên **TỰ MUA** bất kỳ **LOẠI THUỐC NÀO** mà chưa tư vấn ý kiến bác sĩ da liễu!
-
-**Vì sao điều này quan trọng:**
-- 💊 Mỗi loại thuốc có tác dụng phụ khác nhau
-- 👤 Tình trạng da của từng người khác nhau
-- ⚠️ Liều lượng sai có thể gây nguy hiểm cho sức khỏe
-- 🔬 Bác sĩ cần kiểm tra để chẩn đoán chính xác trước
-
-**Bạn cần làm:**
-1️⃣ **Đi khám bác sĩ da liễu** để được chẩn đoán chính xác
-2️⃣ Bác sĩ sẽ **kê đơn** loại thuốc phù hợp với tình trạng của bạn
-3️⃣ Mua **đúng loại** và **đúng liều** theo hướng dẫn của bác sĩ
-
-🏥 **Vui lòng đặt lịch khám bác sĩ da liễu ngay hôm nay!**
-
----
-
-Tôi vẫn sẵn lòng trả lời các câu hỏi khác về kiến thức da liễu."""
-            
-            latency = time.time() - start_time
-            
-            # Add to history
-            conversation_history[conv_id].append({"role": "user", "content": req.message})
-            conversation_history[conv_id].append({"role": "assistant", "content": response_text})
-            
-            return ChatResponse(
-                message=response_text,
-                is_dermatology=True,
-                has_medication_warning=True,
-                conversation_id=conv_id,
-                retrieved_chunks=0,
-                latency=latency,
-                success=True
-            )
-        
-        # If dermatology question (no med warning), retrieve context + generate response
-        logger.info(f"📚 Retrieving medical context...")
-        retrieved = rag_engine.retrieve(req.message, top_k=req.top_k or 3)
-        
-        logger.info(f"✅ Retrieved {len(retrieved)} chunks")
-        
-        # Build context
-        context = "\n\n".join([f"[{r['disease']}] {r['content']}" for r in retrieved])
-        
-        # Build system message for patient chat
-        system_message = prompts.PATIENT_MODE_SYSTEM_VI
-        
-        full_system_message = f"""{system_message}
-
-**KHO TRI THỨC Y TẾ:**
-{context}"""
-        
-        # Add to conversation history
-        conversation_history[conv_id].append({
-            "role": "user",
-            "content": req.message
-        })
-        
-        # Prepare messages for LLM (include conversation history)
-        messages = [
-            {"role": "system", "content": full_system_message}
-        ]
-        
-        # Add conversation history (keep last 5 exchanges to save tokens)
-        for m in conversation_history[conv_id][-10:]:
-            messages.append(m)
-        
-        # Query LLM
-        logger.info(f"🤖 Generating response...")
-        result = llm_service.query(messages, max_tokens=settings.MAX_TOKENS)
-        
-        response_text = result.get("answer", "Xin lỗi, không thể tạo response.")
-        
-        # Add response to history
-        conversation_history[conv_id].append({
-            "role": "assistant",
-            "content": response_text
-        })
-        
-        latency = time.time() - start_time
-        
-        logger.info(f"✅ Done ({latency:.2f}s)")
-        
-        # ⚡ Cleanup memory
-        gc.collect()
-        cleanup_request()
-        
-        return ChatResponse(
-            message=response_text,
-            is_dermatology=True,
-            has_medication_warning=False,
-            conversation_id=conv_id,
-            retrieved_chunks=len(retrieved),
-            latency=latency,
-            success=result.get("success", False)
-        )
-    
-    except Exception as e:
-        error_msg = f"Chat Error: {type(e).__name__} - {str(e)}"
-        logger.error(f"❌ {error_msg}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # ⚡ Cleanup even on error
-        gc.collect()
-        cleanup_request()
-        raise HTTPException(status_code=500, detail=error_msg)
+    return APIResponse(
+        success=True,
+        message="Đã lưu hồ sơ bệnh án thành công vào Excel",
+        data={"case_id": case_id}
+    )

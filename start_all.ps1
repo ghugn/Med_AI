@@ -1,22 +1,24 @@
 # ═══════════════════════════════════════════════════════════════
-#   MedAI — Khởi chạy cả medpilot-core + medpilot-triage
+#   MedAI — Khởi chạy medpilot-core + Frontend MOCK
 # ═══════════════════════════════════════════════════════════════
-#   medpilot-core:  http://localhost:8000 (RAG + LLM chính)
-#   medpilot-triage:     http://localhost:8080 (Triage/Workflow PoC API)
+#   medpilot-core:  http://localhost:8000 (Scribe, Reminder, Chat)
 #   Frontend:       http://localhost:3000 (Giao diện Web)
-#   Docs:           http://localhost:8080/api/docs
 # ═══════════════════════════════════════════════════════════════
 
 Write-Host ""
+[System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 Write-Host "╔═══════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║   MedAI — Starting All Services                  ║" -ForegroundColor Cyan
+Write-Host "║   1. medpilot-core (Port 8000 - Backend)        ║" -ForegroundColor Cyan
+Write-Host "║   2. medpilot-frontend (Port 3000 - Production) ║" -ForegroundColor Cyan
 Write-Host "╚═══════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
 $BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 # ─── 1. Start medpilot-core (port 8000) ─────────────────────
-Write-Host "[1/3] Starting medpilot-core on port 8000..." -ForegroundColor Yellow
+Write-Host "[1/2] Starting medpilot-core on port 8000..." -ForegroundColor Yellow
 
 $medpilotDir = Join-Path $BaseDir "medpilot-core"
 $medpilotVenv = Join-Path $medpilotDir ".venv\Scripts\Activate.ps1"
@@ -33,41 +35,22 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", $medpilotCmd -Wind
 # Chờ medpilot-core khởi động
 Start-Sleep -Seconds 3
 
-# ─── 2. Start medpilot-triage (port 8080) ──────────────────
-Write-Host "[2/3] Starting medpilot-triage on port 8080..." -ForegroundColor Yellow
-
-$backendDir = Join-Path $BaseDir "medpilot-triage"
-$backendVenv = Join-Path $backendDir ".venv\Scripts\Activate.ps1"
-
-$backendCmd = ""
-if (Test-Path $backendVenv) {
-    $backendCmd = "cd '$backendDir'; & '$backendVenv'; python main.py"
-} else {
-    $backendCmd = "cd '$backendDir'; python main.py"
-}
-
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
-
-# Chờ medpilot-triage khởi động
-Start-Sleep -Seconds 3
-
-# ─── 3. Start Frontend (port 3000) ────────────────────────
-Write-Host "[3/3] Starting Frontend on port 3000..." -ForegroundColor Yellow
+# ─── 2. Start Frontend (port 3000) ────────────────────────
+Write-Host "[2/2] Building and Starting Frontend on port 3000 (Production Mode)..." -ForegroundColor Yellow
 
 $frontendDir = Join-Path $BaseDir "medpilot-frontend"
-$frontendCmd = "cd '$frontendDir'; python -m http.server 3000"
+$frontendCmd = "cd '$frontendDir'; npm run build; npm run start"
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -WindowStyle Normal
 
 # Chờ Frontend khởi động
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 5
 
 # ─── 4. Info & Browser ──────────────────────────────────────
 Write-Host ""
 Write-Host "✅ Tất cả services đã khởi chạy!" -ForegroundColor Green
 Write-Host ""
-Write-Host "   medpilot-core (RAG):    http://localhost:8000/docs" -ForegroundColor White
-Write-Host "   medpilot-triage API Docs:    http://localhost:8080/api/docs" -ForegroundColor White
+Write-Host "   medpilot-core:          http://localhost:8000/docs" -ForegroundColor White
 Write-Host "   Frontend (Web UI):      http://localhost:3000" -ForegroundColor White
 Write-Host ""
 Write-Host "Đang mở trình duyệt..." -ForegroundColor Gray

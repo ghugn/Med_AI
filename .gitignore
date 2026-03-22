@@ -1,0 +1,15 @@
+# Chứa các file nặng không cần thiết & dependency
+node_modules/
+.next/
+__pycache__/
+venv/
+.venv/
+.env
+
+# Các file dữ liệu local của backend (có thể không cần push lên Github tùy nhu cầu)
+# Các file sinh ra trong quá trình chạy (log)
+logs/
+*.jsonl
+
+# macOS
+.DS_Store

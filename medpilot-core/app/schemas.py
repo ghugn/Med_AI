@@ -1,132 +1,163 @@
 """
-Định nghĩa cấu trúc dữ liệu request/response
+Pydantic schemas — mirrors the frontend's TypeScript types exactly.
+3 features: Medical Scribe, Clinical Reminder, Patient QnA Chat.
 """
 
-from pydantic import BaseModel
-from typing import List, Optional, Dict
-from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Literal
 
 
-# ============ REQUEST MODELS ============
-class Message(BaseModel):
-    """Một tin nhắn trong chat"""
-    role: str  # "user" hoặc "assistant"
-    content: str  # Nội dung tin nhắn
+# ═══════════════════════════════════════════════════════════════════════════════
+# Feature 1 — Medical Scribe
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PatientInfo(BaseModel):
+    patient_id: Optional[str] = None
+    name: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 
-class QueryRequest(BaseModel):
-    """Request query RAG - Generic"""
-    query: str  # Câu hỏi
-    user_role: Optional[str] = None  # "doctor" (bác sĩ) or "patient" (bệnh nhân)
-    top_k: Optional[int] = None
-    max_tokens: Optional[int] = None
-    temperature: Optional[float] = None
+class ClinicalInfo(BaseModel):
+    chief_complaint: str = ""
+    symptoms: List[str] = Field(default_factory=list)
+    duration: str = ""
+    onset: str = ""
+    lesion_location: List[str] = Field(default_factory=list)
+    lesion_distribution: str = ""
+    itching: Optional[bool] = None
+    pain: Optional[bool] = None
+    burning: Optional[bool] = None
+    scaling: Optional[bool] = None
+    blister: Optional[bool] = None
+    discharge: Optional[bool] = None
+    bleeding: Optional[bool] = None
+    spreading_pattern: str = ""
+    trigger_factors: List[str] = Field(default_factory=list)
+    previous_treatment: List[str] = Field(default_factory=list)
+    history_update: List[str] = Field(default_factory=list)
+    allergy_update: List[str] = Field(default_factory=list)
+    medication_update: List[str] = Field(default_factory=list)
+    current_notes: str = ""
 
 
-class DoctorQueryRequest(BaseModel):
-    """Request cho chế độ BÁC SĨ - Upload file JSON"""
-    # Nội dung JSON của bệnh nhân (parsed from file)
-    clinical_info: Dict  # Thông tin lâm sàng từ file JSON
-    patient_name: Optional[str] = None
-    patient_age: Optional[int] = None
-    chief_complaint: Optional[str] = None
-    top_k: Optional[int] = 5  # Số bệnh retrieve
-    max_tokens: Optional[int] = 2000  # Chi tiết hơn cho bác sĩ
-    temperature: Optional[float] = 0.5  # Ít random hơn để accuracy cao
+class StructuredSummary(BaseModel):
+    one_liner: str = ""
+    important_findings: List[str] = Field(default_factory=list)
+    negative_findings: List[str] = Field(default_factory=list)
+    missing_required_fields: List[str] = Field(default_factory=list)
 
 
-# ============ RESPONSE MODELS ============
-class QueryResponse(BaseModel):
-    """Response từ query RAG - Generic"""
-    query: str
-    answer: str
-    retrieved_chunks: int
-    latency: float
-    success: bool
+class ScribeRequest(BaseModel):
+    request_id: Optional[str] = None
+    module: Literal["medical_scribe"] = "medical_scribe"
+    schema_version: str = "0.1"
+    input_type: Literal["audio", "text"] = "text"
+    transcript: Optional[str] = None
+    audio_base64: Optional[str] = None
+    patient_info: PatientInfo = Field(default_factory=PatientInfo)
 
 
-class DoctorQueryResponse(BaseModel):
-    """Response cho chế độ BÁC SĨ"""
-    patient_name: Optional[str] = None
-    chief_complaint: str
-    # Gợi ý chẩn đoán chính
-    primary_diagnosis: str
-    # Chẩn đoán phản biện (differential diagnosis)
-    differential_diagnosis: List[str]
-    # Đề xuất xét nghiệm
-    recommended_tests: List[str]
-    # Ghi chú thêm
-    clinical_notes: str
-    # Tất cả dữ liệu retrieve
-    retrieved_diseases: List[Dict]
-    latency: float
-    success: bool
+class ScribeResponse(BaseModel):
+    request_id: str
+    module: Literal["medical_scribe"] = "medical_scribe"
+    schema_version: str = "0.1"
+    patient_info: PatientInfo
+    clinical_info: ClinicalInfo
+    structured_summary: StructuredSummary
+    draft_note: str = ""
+    missing_required_fields: List[str] = Field(default_factory=list)
+    uncertain_fields: List[str] = Field(default_factory=list)
+    requires_doctor_approval: bool = True
+    field_confidence: Dict[str, float] = Field(default_factory=dict)
+    latency_ms: float = 0
+    model_version: str = "scribe_v1"
 
 
-class PatientChatResponse(BaseModel):
-    """Response chat cho bệnh nhân"""
-    message: str  # Response từ AI
-    is_dermatology: bool  # True = về da liễu
-    has_medication_warning: bool  # True = phát hiện mua thuốc
-    conversation_id: str
-    retrieved_chunks: int
-    latency: float
-    success: bool
+# ═══════════════════════════════════════════════════════════════════════════════
+# Feature 2 — Clinical Reminder
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ReminderRequest(BaseModel):
+    request_id: Optional[str] = None
+    module: Literal["clinical_reminder"] = "clinical_reminder"
+    schema_version: str = "0.1"
+    structured_record: ScribeResponse
+    previous_records: Optional[List[ScribeResponse]] = None
 
 
-class HealthResponse(BaseModel):
-    """Health check response"""
-    status: str
-    timestamp: datetime
-    model: str
-    chat_api: str
-    vector_db: str
+class ReminderResponse(BaseModel):
+    request_id: str
+    module: Literal["clinical_reminder"] = "clinical_reminder"
+    missing_critical_info: List[str] = Field(default_factory=list)
+    questions_to_ask: List[str] = Field(default_factory=list)
+    red_flags: List[str] = Field(default_factory=list)
+    possible_considerations: List[str] = Field(default_factory=list)
+    suggested_next_checks: List[str] = Field(default_factory=list)
+    guideline_evidence: List[str] = Field(default_factory=list)
+    latency_ms: float = 0
+    model_version: str = "reminder_v1"
 
 
-class StatsResponse(BaseModel):
-    """Statistics response"""
-    total_chunks: int
-    db_path: str
-    chat_api: str
-    model: str
-    timestamp: datetime
+# ═══════════════════════════════════════════════════════════════════════════════
+# Feature 3 — Patient QnA Chatbot
+# ═══════════════════════════════════════════════════════════════════════════════
 
-
-class RoleSelectionResponse(BaseModel):
-    """Response để hỏi user role"""
-    message: str
-    options: list  # ["doctor", "patient"]
-    timestamp: datetime
-
-
-class ReloadResponse(BaseModel):
-    """Reload response"""
-    status: str
-    message: str
-    diseases_loaded: int
-    chunks_indexed: int
-    timestamp: datetime
-
-
-# ============ CHAT MODELS (Patient Mode) ============
 class ChatMessage(BaseModel):
-    """Một tin nhắn trong chat conversation"""
-    role: str  # "user" hoặc "assistant"
-    content: str  # Nội dung tin nhắn
+    role: Literal["user", "assistant"]
+    content: str
 
 
 class ChatRequest(BaseModel):
-    """Request chat liên tục cho bệnh nhân"""
-    message: str  # Câu hỏi mới nhất từ user
-    conversation_id: Optional[str] = None  # ID để track conversation
-    top_k: Optional[int] = 3  # Số kết quả retrieve
+    request_id: Optional[str] = None
+    module: Literal["patient_derma_qna"] = "patient_derma_qna"
+    schema_version: str = "1.0"
+    user_role: Literal["patient"] = "patient"
+    question: str
+    history: List[ChatMessage] = Field(default_factory=list)
+    language: Literal["vi", "en"] = "vi"
+    image_base64: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
-    """Response chat từ AI"""
-    message: str  # Response từ AI
-    is_dermatology: bool  # True = về da liễu, False = ngoài lĩnh vực
-    conversation_id: str  # ID conversation
-    retrieved_chunks: int  # Số chunks retrieve được (nếu about dermatology)
-    latency: float  # Thời gian xử lý
-    success: bool  # Success or not
+    request_id: str
+    module: Literal["patient_derma_qna"] = "patient_derma_qna"
+    schema_version: str = "1.0"
+    user_role: Literal["patient"] = "patient"
+    question: str
+    answer: str
+    safety_notice: str = ""
+    possible_topics: List[str] = Field(default_factory=list)
+    when_to_seek_care: List[str] = Field(default_factory=list)
+    red_flag_advice: List[str] = Field(default_factory=list)
+    source_evidence: List[str] = Field(default_factory=list)
+    confidence_level: Literal["high", "medium", "low"] = "medium"
+    requires_doctor_followup: bool = True
+    requires_emergency_care: bool = False
+    latency_ms: float = 0
+    model_version: str = "patient_qna_v1"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Feature 4 — Case Management (from Triage)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PatientInput(BaseModel):
+    bac_si_id: str
+    ho_ten: str
+    tuoi: int
+    gioi_tinh: str
+    trieu_chung_transcript: str = ""
+
+class DoctorApproveInput(BaseModel):
+    draft_note: str = ""
+    spo2: Optional[str] = None
+    hr: Optional[str] = None
+    bp: Optional[str] = None
+    red_flags: Optional[str] = None
+    uncertainty_score: Optional[float] = None
+
+class APIResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict] = None
