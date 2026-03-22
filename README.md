@@ -1,9 +1,10 @@
 # MedAI — Trợ lý AI Phân loại & Chẩn đoán Da liễu
 
-Hệ thống MedAI cung cấp trải nghiệm hoàn chỉnh từ tiếp nhận bệnh nhân đến tra cứu chuyên sâu cho lĩnh vực Da liễu. Dự án bao gồm 2 thành phần chính hoạt động song song.
+Hệ thống MedAI bao gồm 3 thành phần hoạt động song song để cung cấp trải nghiệm hoàn chỉnh từ tiếp nhận bệnh nhân (Triage) đến tra cứu chuyên sâu (RAG).
 
-1. **medpilot-core (Port 8000)**: Backend xử lý chính, cung cấp cơ sở tri thức da liễu (RAG Vector Database) và API giao tiếp với các mô hình LLM.
-2. **medpilot-frontend (Port 3000)**: Giao diện Web trực diện dành cho bác sĩ/bệnh nhân, xây dựng trên nền tảng Next.js.
+1. **medpilot-core (Port 8000)**: Hệ thống chính. Cung cấp cơ sở tri thức da liễu (RAG Vector Database) và xử lý ngôn ngữ AI.
+2. **medpilot-triage (Port 8080)**: Hệ thống phân luồng (Triage Workflow API). Nơi tiếp nhận thông tin, phân tích ban đầu, xin ý kiến bác sĩ, và lưu trữ dữ liệu vào Excel.
+3. **medpilot-frontend (Port 3000)**: Giao diện Web trực diện dành cho bác sĩ/bệnh nhân.
 
 ---
 
@@ -11,11 +12,10 @@ Hệ thống MedAI cung cấp trải nghiệm hoàn chỉnh từ tiếp nhận b
 
 ### Yêu cầu hệ thống
 - Python 3.10 trở lên
-- Node.js & npm (để chạy frontend)
-- Lệnh Git cơ bản
+- Git
 - Mô hình LLM đang chạy (vLLM hoặc Ollama)
 
-### Bước 1: Cài đặt cho medpilot-core (Backend)
+### Bước 1: Cài đặt cho medpilot-core (Hệ thống chính)
 Mở terminal và chạy lệnh sau:
 ```bash
 cd medpilot-core
@@ -30,29 +30,37 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-#### Cấu hình Môi trường Backend (Environment Variables)
-Sao chép file `.env.example` thành `.env` trong thư mục `medpilot-core` và cấu hình đường dẫn tới LLM của bạn:
+### Bước 2: Cài đặt cho medpilot-triage (Hệ thống Triage/Frontend)
+Mở một terminal MỚI và chạy lệnh sau:
+```bash
+cd medpilot-triage
+python -m venv .venv
+
+# Kích hoạt môi trường ảo
+# Trên Windows:
+.venv\Scripts\activate
+# Trên Mac/Linux:
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### Bước 3: Cấu hình Môi trường (Environment Variables)
+Trong thư mục `medpilot-triage`, đã có sẵn file `.env` mẫu. Bạn mở file `medpilot-triage/.env` ra và cấu hình đường dẫn tới LLM của bạn:
 
 ```ini
+BACKEND_PORT=8080
+
 # Sửa đường dẫn này trỏ tới server AI của bạn (Ollama hoặc vLLM)
 # Ví dụ Ollama: http://localhost:11434/v1
 # Ví dụ vLLM:   http://localhost:8001/v1
 VLLM_BASE_URL=http://localhost:8001/v1
 VLLM_MODEL_NAME=default
 VLLM_TIMEOUT=180
+
+# Đường dẫn gọi sang medpilot-core (Mặc định không cần sửa)
+MEDPILOT_API_URL=http://localhost:8000/api/v1
 ```
-
-### Bước 2: Cài đặt cho medpilot-frontend (Frontend Web GUI)
-Mở một terminal MỚI và chạy lệnh sau:
-```bash
-cd medpilot-frontend
-
-# Cài đặt các gói thư viện Node.js
-npm install
-```
-
-#### Cấu hình Môi trường Frontend (Tùy chọn)
-Nếu cần thay đổi API Backend theo mặc định (http://localhost:8000), bạn có thể tạo/chỉnh sửa biến môi trường trong `medpilot-frontend/.env.local`. 
 
 ---
 
@@ -61,42 +69,42 @@ Nếu cần thay đổi API Backend theo mặc định (http://localhost:8000), 
 Dự án đã được trang bị script khởi chạy tự động cả hai hệ thống cùng lúc.
 
 **Trên Windows:**
-Chỉ cần bấm đúp chuột vào file `start_all.bat` nằm ở thư mục gốc, hoặc mở PowerShell và chạy lệnh `.\start_all.ps1`.
+Chỉ cần bấm đúp chuột vào file `start_all.bat` nằm ở thư mục gốc (hoặc chuột phải > Run with PowerShell vào file `start_all.ps1`).
 
-Scripts này sẽ tự động khởi động backend bằng Uvicorn và sử dụng thư viện Next.js để build/run code production cho frontend ở cổng 3000. 
-
-**Chạy thủ công (nếu lỗi script hoặc để dev code):**
+**Chạy thủ công (nếu lỗi script):**
 Mở 2 cửa sổ terminal:
 
-*Terminal 1 (Backend):*
+*Terminal 1:*
 ```bash
 cd medpilot-core
 .venv\Scripts\activate
-uvicorn app.main:app --port 8000 --reload
+uvicorn app.main:app --port 8000
 ```
 
-*Terminal 2 (Frontend)*
+*Terminal 2:*
 ```bash
-cd medpilot-frontend
-npm run dev
+cd medpilot-triage
+.venv\Scripts\activate
+python main.py
 ```
-*(Lưu ý: Nếu sử dụng `start_all.bat`, dự án sẽ tự chạy tiến trình production: `npm run build && npm run start`)*
 
-Sau khi chạy xong, trình duyệt sẽ tự mở trang web tại địa chỉ: `http://localhost:3000`. API Document của backend có thể xem tại: `http://localhost:8000/docs`.
+Sau khi chạy xong, trình duyệt sẽ tự động mở trang web giao diện tại địa chỉ: `http://localhost:3000`.
 
 ---
 
 ## 📂 Nơi lưu trữ dữ liệu quan trọng
 
-- **Lịch sử & Dữ liệu ghi nhớ:** Nằm trong thư mục `medpilot-core/data/` hoặc local db ở backend.
+- **Mã nguồn giao diện:** Nằm hoàn toàn trong thư mục `medpilot-frontend/`. Bạn có thể chỉnh sửa `index.html` ở đây, không cần khởi động lại backend.
+- **Danh sách bệnh nhân:** Được tự động lưu vào file Excel tại `medpilot-triage/database.xlsx` sau khi bác sĩ ấn "Phê duyệt & Lưu".
+- **Lịch sử truy xuất chi tiết:** Nằm trong thư mục `medpilot-triage/data/cases/`.
 - **Dữ liệu RAG (Cơ sở tri thức):** Nằm trong thư mục `medpilot-core/chroma_db/`.
 
 ---
 
-## 🤝 Lỗi phổ biến
+## 🤝 Góp ý đóng góp & Lỗi phổ biến
 
-1. **Lỗi Frontend báo thiếu file (ví dụ "SyntaxError: Unexpected token"):**
-   - Đảm bảo bạn đã kích hoạt và tải các gói (thực hiện lệnh `npm install`) trước khi chạy dự án.
+1. **Màn hình thông báo "RAG: offline" ở góc phải:**
+   - Nghĩa là `medpilot-core` chưa chạy ở port 8000. Bạn cần kiểm tra xem terminal chạy uvicorn có báo lỗi gì không.
 
-2. **Lỗi "Không có phản hồi" khi gửi chat tới AI:**
-   - Nguyên nhân chính là do cấu hình API của LLM (Ollama/vLLM) trong hệ thống chưa bật, cấu hình cổng không khớp, hoặc mô hình LLM chưa được nạp lên bộ nhớ GPU/CPU.
+2. **Lỗi "Không có phản hồi" khi chat hoặc Triage quay mãi không dừng:**
+   - Nguyên nhân chính là do cấu hình API của LLM (Ollama/vLLM) trong file `medpilot-triage/.env` chưa đúng, hoặc model LLM chưa được load lên bộ nhớ.

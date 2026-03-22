@@ -66,9 +66,9 @@ class RAGEngine:
             pass
         return [0.0] * 384
 
-
+    def _init_db(self):
         logger.info(f"💾 Initializing Chroma DB...")
-        self.chroma_client = chromadb.PersistentClient(path=db_path)
+        self.chroma_client = chromadb.PersistentClient(path=self.db_path)
         self.collection = self.chroma_client.get_or_create_collection(
             name="medical_diseases",
             metadata={"hnsw:space": "cosine"}
