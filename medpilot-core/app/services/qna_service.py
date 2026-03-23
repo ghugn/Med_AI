@@ -10,9 +10,9 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 class QnAService:
-    _instance = None
+    _instance: Optional["QnAService"] = None
 
-    def __init__(self, data_path: str = None):
+    def __init__(self, data_path: Optional[str] = None):
         if not data_path:
             # Default to the data directory in medpilot-core
             base_dir = Path(__file__).parent.parent.parent
@@ -24,7 +24,7 @@ class QnAService:
         self.is_loaded = False
 
     @classmethod
-    def get_instance(cls, data_path: str = None):
+    def get_instance(cls, data_path: Optional[str] = None):
         if cls._instance is None:
             cls._instance = cls(data_path)
         return cls._instance

@@ -25,7 +25,7 @@ $medpilotVenv = Join-Path $medpilotDir ".venv\Scripts\Activate.ps1"
 
 $medpilotCmd = ""
 if (Test-Path $medpilotVenv) {
-    $medpilotCmd = "cd '$medpilotDir'; & '$medpilotVenv'; uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    $medpilotCmd = "cd '$medpilotDir'; . '$medpilotVenv'; uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 } else {
     $medpilotCmd = "cd '$medpilotDir'; uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 }

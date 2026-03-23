@@ -49,16 +49,25 @@ async def chat_endpoint(req: ChatRequest):
     else:
         # 2. Find best matching QnA via QnAService
         qna_service = get_qna_service()
-        data = qna_service.find_best_match(req.question)
+        data = qna_service.find_best_match(req.question, threshold=0.75)
 
         # 3. RAG Fallback if QnA yields no good match
-        if data.get("confidence_level") == "low" or "Xin lỗi" in data.get("answer", ""):
+        if data == qna_service.default_answer or data.get("confidence_level") == "low" or "Xin lỗi" in data.get("answer", ""):
             logger.info("[Chat] Falling back to RAG...")
             from app.rag_engine import RAGEngine
             from app.llm_service import LLMService
+            from app.config import settings
             
-            rag_engine = RAGEngine()
-            llm_service = LLMService()
+            rag_engine = RAGEngine(
+                diseases_json=settings.DISEASES_JSON,
+                db_path=settings.DB_PATH,
+                embedding_model=settings.EMBEDDING_MODEL
+            )
+            llm_service = LLMService(
+                api_url=settings.LLM_API_URL,
+                model=settings.VLLM_MODEL if "/v1/" in settings.LLM_API_URL else settings.OLLAMA_MODEL,
+                timeout=settings.TIMEOUT
+            )
             
             retrieved = rag_engine.retrieve(req.question, top_k=3)
             context_str = "\n".join([f"Bệnh: {doc['disease']}\nNội dung: {doc['content']}" for doc in retrieved])

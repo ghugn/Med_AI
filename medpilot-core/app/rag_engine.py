@@ -47,24 +47,24 @@ class RAGEngine:
 
         logger.info(f"📥 Configured embedding model: {embedding_model} (cache size: {cache_size})")
         self.embedding_model_name = embedding_model
+        
+        # Initialize DB
+        self._init_db()
 
     def _get_embedding(self, text: str) -> list:
+        # Lazy load sentence transformer
+        if not hasattr(self, 'st_model'):
+            from sentence_transformers import SentenceTransformer
+            logger.info(f"⏳ Loading SentenceTransformer model: {self.embedding_model_name}")
+            self.st_model = SentenceTransformer(self.embedding_model_name)
+            logger.info("✅ SentenceTransformer loaded")
+            
         try:
-            response = requests.post(
-                "http://localhost:11434/api/embeddings",
-                json={
-                    "model": "all-minilm", # User can use any model
-                    "prompt": text
-                },
-                timeout=2.0
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if "embedding" in data:
-                    return data["embedding"]
+            embedding = self.st_model.encode(text)
+            return embedding.tolist()
         except Exception as e:
-            pass
-        return [0.0] * 384
+            logger.error(f"❌ Error getting embedding: {e}")
+            return [0.0] * 384
 
     def _init_db(self):
         logger.info(f"💾 Initializing Chroma DB...")
@@ -133,6 +133,9 @@ class RAGEngine:
 
             if len(chunk) > 50:
                 chunks.append(chunk)
+
+            if end >= len(text):
+                break
 
             start = end - overlap
 
@@ -229,12 +232,16 @@ class RAGEngine:
         
         # Lazy index on first query
         if not self.indexed:
-            logger.info("🔄 First query - indexing diseases...")
-            if not self.diseases_cached:
-                self.diseases_cached = self.load_diseases_from_json()
-            if self.diseases_cached:
-                self.index_diseases(self.diseases_cached)
-                self.indexed = True
+            logger.info("🔄 First query - checking database...")
+            if self.get_count() > 0:
+                logger.info(f"✅ Found {self.get_count()} chunks already indexed in database. Skipping re-indexing.")
+            else:
+                logger.info("🔄 Database empty - loading & indexing diseases...")
+                if not self.diseases_cached:
+                    self.diseases_cached = self.load_diseases_from_json()
+                if self.diseases_cached:
+                    self.index_diseases(self.diseases_cached)
+            self.indexed = True
         
         if top_k is None:
             top_k = self.top_k
